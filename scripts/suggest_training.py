@@ -32,6 +32,7 @@ from app.processors.recovery_score import RecoveryScore
 from app.processors.sleep_metrics import SleepMetrics
 from app.processors.hrv_metrics import HRVMetrics
 from app.ai.insights import InsightsGenerator
+from app.notifications.email_report import send_training_suggestion_email
 
 Path("logs").mkdir(exist_ok=True)
 logging.basicConfig(
@@ -276,6 +277,16 @@ def main():
             title=f'Propozycja treningu {target_date} ({day_name})',
             content=suggestion,
             priority='high'
+        )
+        # Wyslij na email
+        send_training_suggestion_email(
+            report_date=str(target_date),
+            day_name=day_name,
+            planned_workout=planned_workout,
+            body_battery=body_battery,
+            readiness_score=score,
+            sleep_today_hours=sleep_today_hours,
+            suggestion=suggestion,
         )
     else:
         print("\n  Nie udało się wygenerować propozycji")

@@ -24,7 +24,7 @@ Automatyczny agent AI do analizy danych z Garmin Connect - HRV, sen, regeneracja
 - Dzienne podsumowania z interpretacją metryk
 - Personalizowane rekomendacje dopasowane do Twojego profilu
 - **Notatnik trenera** - agent sam zapisuje obserwacje i trendy między sesjami
-- Codzienny raport wysyłany na WhatsApp (Twilio)
+- Codzienny raport wysyłany na **WhatsApp** (Twilio) i/lub **email** (SMTP)
 
 ## 📁 Struktura Projektu
 
@@ -46,10 +46,13 @@ garmin-ai/
 │   │   ├── prompts.py
 │   │   └── insights.py
 │   └── notifications/      # Powiadomienia
-│       └── whatsapp.py
+│       ├── whatsapp.py
+│       └── email_report.py
 ├── scripts/                # Skrypty do uruchamiania
 │   ├── run_daily_sync.py
 │   ├── generate_daily_report.py
+│   ├── suggest_training.py
+│   ├── test_email.py
 │   └── setup_garmin_2fa.py
 ├── user_context.md         # Twój profil treningowy (edytuj!)
 ├── agent_notes.md          # Notatnik trenera AI (auto-generowany)
@@ -200,6 +203,49 @@ Dziś gotowość na poziomie 73/100...
 
 > Jeśli zmienne Twilio nie są ustawione w `.env`, wysyłka jest po prostu pomijana — raport generuje się normalnie.
 
+## 📧 Raporty Email (SMTP)
+
+Moduł email jest alternatywą lub uzupełnieniem dla WhatsApp — działa z Gmailem, Outlookiem i każdym serwerem SMTP.
+
+### Krok 1: App Password (Gmail)
+
+1. Wejdź na **https://myaccount.google.com/apppasswords**
+   *(wymaga włączonej weryfikacji dwuetapowej — Konto Google → Bezpieczeństwo → Weryfikacja dwuetapowa)*
+2. Wpisz nazwę np. `Garmin AI` → kliknij **Utwórz**
+3. Skopiuj wygenerowany 16-znakowy kod (bez spacji)
+
+> Outlook/Hotmail: użyj `EMAIL_SMTP_HOST=smtp.office365.com` i `EMAIL_SMTP_PORT=587`
+
+### Krok 2: Uzupełnij `.env`
+
+```env
+EMAIL_SMTP_HOST=smtp.gmail.com
+EMAIL_SMTP_PORT=465
+EMAIL_SMTP_USER=twoj_email@gmail.com
+EMAIL_SMTP_PASSWORD=xxxxxxxxxxxxxxxx
+EMAIL_TO=twoj_email@gmail.com
+```
+
+> Port **465** = SSL (domyślny dla Gmail). Port **587** = STARTTLS (Outlook i inne).
+
+### Krok 3: Test
+
+```bash
+.venv/bin/python scripts/test_email.py
+```
+
+Skrypt wyśle dwa testowe emaile (raport dzienny + propozycja treningu) z przykładowymi danymi.
+
+### Format emaila
+
+Oba raporty to responsywny **HTML email** z:
+- Nagłówkiem z gradientem
+- Tabelą metryk z emoji (gotowość, sen, HRV, waga, VO2max)
+- Blokiem z rekomendacją AI
+- Stopką z datą generowania
+
+> Jeśli zmienne email nie są ustawione w `.env`, wysyłka jest pomijana — raport generuje się normalnie.
+
 ## ⚙️ Automatyzacja (cron)
 
 Ustaw cron żeby raporty przychodziły automatycznie co rano:
@@ -283,6 +329,15 @@ DATABASE_URL=postgresql://user:password@localhost:5432/garmin_ai
 ### WhatsApp nie wysyła
 - Sprawdź czy numer Sandbox jest aktywny (ważny 72h od dołączenia — wyślij ponownie `join <słowo>` jeśli wygasł)
 - Sprawdź logi: `logs/daily_report.log`
+
+### Email nie wysyła — `535 Username and Password not accepted`
+- Nie używaj zwykłego hasła Gmail — musisz wygenerować **App Password**
+- Wejdź na https://myaccount.google.com/apppasswords (wymagana weryfikacja dwuetapowa)
+- Skonfigurowane zmienne możesz przetestować: `.venv/bin/python scripts/test_email.py`
+
+### Email nie wysyła — `Connection refused` / timeout
+- Sprawdź czy `EMAIL_SMTP_PORT` jest właściwy: **465** dla Gmail, **587** dla Outlook
+- Sprawdź czy firewall/sieć nie blokuje portu 465/587
 
 ### Logi
 ```

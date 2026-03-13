@@ -21,6 +21,7 @@ from app.processors.sleep_metrics import SleepMetrics
 from app.processors.hrv_metrics import HRVMetrics
 from app.ai.insights import InsightsGenerator, InsightsAssistant
 from app.notifications.whatsapp import send_whatsapp_report
+from app.notifications.email_report import send_daily_report_email
 
 # Upewnij się, że katalog logs istnieje
 Path("logs").mkdir(exist_ok=True)
@@ -222,6 +223,19 @@ def main():
         )
         if sent:
             print("  📱 Raport wysłany na WhatsApp ✓\n")
+
+        # === WYSYŁKA EMAIL ===
+        sent_email = send_daily_report_email(
+            report_date=str(date.today()),
+            readiness=readiness,
+            sleep=sleep_trends,
+            hrv=hrv_trend,
+            weight_kg=weight_kg,
+            vo2max=vo2max_val,
+            ai_insight=insight if ai.client else None,
+        )
+        if sent_email:
+            print("  📧 Raport wysłany na email ✓\n")
 
         # Zamknięcie sesji
         session.close()
