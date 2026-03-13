@@ -1,6 +1,6 @@
 # Garmin AI Analytics
 
-Automatyczny agent AI do analizy danych z Garmin Connect - HRV, sen, regeneracja i rekomendacje treningowe z codziennym raportem na WhatsApp.
+Automatyczny agent AI do analizy danych z Garmin Connect - HRV, sen, regeneracja i spersonalizowane rekomendacje treningowe. Codziennie wysyła raport zdrowotny oraz propozycję treningu dopasowanego do Twoich danych biologicznych i planu treningowego — na WhatsApp i/lub email.
 
 ## 🎯 Funkcjonalności
 
@@ -22,9 +22,10 @@ Automatyczny agent AI do analizy danych z Garmin Connect - HRV, sen, regeneracja
 
 ### AI Personal Trainer
 - Dzienne podsumowania z interpretacją metryk
-- Personalizowane rekomendacje dopasowane do Twojego profilu
-- **Notatnik trenera** - agent sam zapisuje obserwacje i trendy między sesjami
-- Codzienny raport wysyłany na **WhatsApp** (Twilio) i/lub **email** (SMTP)
+- Personalizowane rekomendacje dopasowane do Twojego profilu (`user_context.md`)
+- **Propozycja treningu** — AI uwzględnia dane zdrowotne (HRV, sen, Body Battery, gotowość) oraz Twój plan i cel treningowy zapisany w pliku `user_context.md`
+- **Notatnik trenera** — agent sam zapisuje obserwacje i trendy między sesjami (`agent_notes.md`)
+- Raport zdrowotny i propozycja treningu wysyłane automatycznie na **WhatsApp** (Twilio) i/lub **email** (SMTP)
 
 ## 📁 Struktura Projektu
 
