@@ -66,10 +66,22 @@ garmin-ai/
 
 ```bash
 cd garmin-ai
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv .venv
 ```
+
+Instalacja zależności:
+
+**Linux / macOS:**
+```bash
+.venv/bin/pip install -r requirements.txt
+```
+
+**Windows:**
+```bat
+.venv\Scripts\pip install -r requirements.txt
+```
+
+> Opcjonalnie możesz aktywować venv (`source .venv/bin/activate` na Linux/macOS lub `.venv\Scripts\activate` na Windows), wtedy wszędzie poniżej wystarczy samo `python` zamiast pełnej ścieżki.
 
 ### 2. Konfiguracja `.env`
 
@@ -88,8 +100,15 @@ OPENAI_API_KEY=sk-your-api-key
 ### 3. Konfiguracja 2FA Garmin (jednorazowo)
 
 Jeśli masz włączone 2FA na koncie Garmin:
+
+**Linux / macOS:**
 ```bash
-./bin/python scripts/setup_garmin_2fa.py
+.venv/bin/python3 scripts/setup_garmin_2fa.py
+```
+
+**Windows:**
+```bat
+.venv\Scripts\python scripts/setup_garmin_2fa.py
 ```
 
 Skrypt:
@@ -102,12 +121,19 @@ Skrypt:
 
 ### 4. Pierwsze uruchomienie
 
+**Linux / macOS:**
 ```bash
 # Synchronizacja danych (ostatnie 7 dni)
-./bin/python scripts/run_daily_sync.py
+.venv/bin/python3 scripts/run_daily_sync.py
 
 # Generowanie raportu
-./bin/python scripts/generate_daily_report.py
+.venv/bin/python3 scripts/generate_daily_report.py
+```
+
+**Windows:**
+```bat
+.venv\Scripts\python scripts/run_daily_sync.py
+.venv\Scripts\python scripts/generate_daily_report.py
 ```
 
 ## 👤 Personalizacja profilu (`user_context.md`)
@@ -179,7 +205,7 @@ TWILIO_WHATSAPP_TO=whatsapp:+48TWÓJNUMER
 ### Krok 4: Test
 
 ```bash
-./bin/python scripts/generate_daily_report.py
+.venv/bin/python3 scripts/generate_daily_report.py
 ```
 
 Na końcu raportu pojawi się `📱 Raport wysłany na WhatsApp ✓`
@@ -230,8 +256,13 @@ EMAIL_TO=twoj_email@gmail.com
 
 ### Krok 3: Test
 
+**Linux / macOS:**
 ```bash
-.venv/bin/python scripts/test_email.py
+.venv/bin/python3 scripts/test_email.py
+```
+**Windows:**
+```bat
+.venv\Scripts\python scripts/test_email.py
 ```
 
 Skrypt wyśle dwa testowe emaile (raport dzienny + propozycja treningu) z przykładowymi danymi.
@@ -246,22 +277,38 @@ Oba raporty to responsywny **HTML email** z:
 
 > Jeśli zmienne email nie są ustawione w `.env`, wysyłka jest pomijana — raport generuje się normalnie.
 
-## ⚙️ Automatyzacja (cron)
+## ⚙️ Automatyzacja
 
-Ustaw cron żeby raporty przychodziły automatycznie co rano:
+### Linux / macOS (cron)
 
 ```bash
+mkdir -p logs
 crontab -e
 ```
 
-Dodaj:
-```
-# Synchronizacja danych o 6:00
-0 6 * * * cd /Users/grucha/Documents/Garmin/Proj_API/garmin-ai && ./bin/python scripts/run_daily_sync.py >> logs/cron_sync.log 2>&1
+Przykład — dostosuj ścieżkę `/home/user/garmin-ai` do swojego katalogu:
+```cron
+# Synchronizacja — Pon-Pt o 5:50, weekend o 9:00
+50 5 * * 1-5 cd /home/user/garmin-ai && .venv/bin/python3 scripts/run_daily_sync.py >> logs/cron_sync.log 2>&1
+0  9 * * 6,0 cd /home/user/garmin-ai && .venv/bin/python3 scripts/run_daily_sync.py >> logs/cron_sync.log 2>&1
 
-# Raport i WhatsApp o 7:00
-0 7 * * * cd /Users/grucha/Documents/Garmin/Proj_API/garmin-ai && ./bin/python scripts/generate_daily_report.py >> logs/cron_report.log 2>&1
+# Raport dzienny — Pon-Pt o 5:52, weekend o 9:10
+52 5 * * 1-5 cd /home/user/garmin-ai && .venv/bin/python3 scripts/generate_daily_report.py >> logs/cron_report.log 2>&1
+10 9 * * 6,0 cd /home/user/garmin-ai && .venv/bin/python3 scripts/generate_daily_report.py >> logs/cron_report.log 2>&1
+
+# Propozycja treningu — Pon-Pt o 15:30
+30 15 * * 1-5 cd /home/user/garmin-ai && .venv/bin/python3 scripts/suggest_training.py >> logs/cron_training.log 2>&1
 ```
+
+### Windows (Task Scheduler)
+
+1. Otwórz **Harmonogram zadań** → *Utwórz zadanie podstawowe*
+2. Wyzwalacz: Dzienny, o wybranej godzinie
+3. Akcja: *Uruchom program*
+   - Program: `C:\ścieżka\do\garmin-ai\.venv\Scripts\python.exe`
+   - Argumenty: `scripts\run_daily_sync.py`
+   - Uruchom w: `C:\ścieżka\do\garmin-ai`
+4. Powtórz dla `generate_daily_report.py` i `suggest_training.py`
 
 ## 📈 Jak działa analiza
 
@@ -314,8 +361,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/garmin_ai
 ## 🐛 Troubleshooting
 
 ### Błąd autoryzacji Garmin / 2FA
+**Linux / macOS:**
 ```bash
-./bin/python scripts/setup_garmin_2fa.py
+.venv/bin/python3 scripts/setup_garmin_2fa.py
+```
+**Windows:**
+```bat
+.venv\Scripts\python scripts/setup_garmin_2fa.py
 ```
 
 ### Sen/HRV pokazuje 0 lub brak danych
@@ -333,7 +385,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/garmin_ai
 ### Email nie wysyła — `535 Username and Password not accepted`
 - Nie używaj zwykłego hasła Gmail — musisz wygenerować **App Password**
 - Wejdź na https://myaccount.google.com/apppasswords (wymagana weryfikacja dwuetapowa)
-- Skonfigurowane zmienne możesz przetestować: `.venv/bin/python scripts/test_email.py`
+- Skonfigurowane zmienne możesz przetestować: `.venv/bin/python3 scripts/test_email.py`
 
 ### Email nie wysyła — `Connection refused` / timeout
 - Sprawdź czy `EMAIL_SMTP_PORT` jest właściwy: **465** dla Gmail, **587** dla Outlook
