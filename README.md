@@ -77,7 +77,7 @@ cp .env.example .env
 
 Minimalna konfiguracja:
 ```env
-GARMIN_EMAIL=twoj_email@garmin.com
+GARMIN_EMAIL=twoj_email@example.com
 GARMIN_PASSWORD=twoje_haslo
 OPENAI_API_KEY=sk-your-api-key
 ```
