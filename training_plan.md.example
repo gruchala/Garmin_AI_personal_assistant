@@ -1,0 +1,37 @@
+# Plan treningowy tygodniowy
+
+<!-- Utwórz kopię tego pliku jako training_plan.md i wypełnij swoim planem.
+     Agent AI czyta ten plik przed wygenerowaniem propozycji treningu.
+     Opisz co CHCESZ robić w poszczególne dni — agent oceni czy to dobry pomysł
+     biorąc pod uwagę aktualny Body Battery, gotowość i HRV. -->
+
+## Poniedziałek
+(opisz planowany trening — typ, czas, intensywność)
+
+## Wtorek
+(opisz planowany trening)
+
+## Środa
+(opisz planowany trening)
+
+## Czwartek
+(opisz planowany trening)
+
+## Piątek
+(opisz planowany trening)
+
+## Sobota
+(opisz planowany trening)
+
+## Niedziela
+(opisz planowany trening)
+
+---
+
+## Priorytety i uwagi dla agenta
+
+- Najważniejsze dni treningowe to: ... — bronić ich nawet przy niższej gotowości
+- Jeśli Body Battery < 40 rano — zamień trening na regeneracyjny lub przesuń
+- Jeśli Body Battery < 25 — odpoczynek bez negocjacji
+- Miesięczny cel biegowy: ... km
+- Przed wyścigiem (jeśli wpisany w user_context.md) — 2 dni light przed startem

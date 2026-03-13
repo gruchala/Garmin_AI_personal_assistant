@@ -1,0 +1,1 @@
+"""Moduł bazy danych"""

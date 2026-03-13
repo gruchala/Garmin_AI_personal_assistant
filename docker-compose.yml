@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (opcjonalne)
+  postgres:
+    image: postgres:15-alpine
+    container_name: garmin-ai-db
+    environment:
+      POSTGRES_DB: garmin_ai
+      POSTGRES_USER: garmin
+      POSTGRES_PASSWORD: garmin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U garmin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Application
+  api:
+    build: .
+    container_name: garmin-ai-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://garmin:garmin123@postgres:5432/garmin_ai
+      - GARMIN_EMAIL=${GARMIN_EMAIL}
+      - GARMIN_PASSWORD=${GARMIN_PASSWORD}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./app:/app/app
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Scheduler dla codziennej synchronizacji (opcjonalne)
+  scheduler:
+    build: .
+    container_name: garmin-ai-scheduler
+    environment:
+      - DATABASE_URL=postgresql://garmin:garmin123@postgres:5432/garmin_ai
+      - GARMIN_EMAIL=${GARMIN_EMAIL}
+      - GARMIN_PASSWORD=${GARMIN_PASSWORD}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Uruchom synchronizację codziennie o 6:00
+    command: >
+      sh -c "
+      while true; do
+        echo 'Waiting for scheduled sync...';
+        sleep 3600;
+        if [ $$(date +%H) -eq 6 ]; then
+          python scripts/run_daily_sync.py;
+          sleep 82800;
+        fi;
+      done
+      "
+
+volumes:
+  postgres_data:
