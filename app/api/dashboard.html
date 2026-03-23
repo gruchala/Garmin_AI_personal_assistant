@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Garmin AI Panel</title>
+  <style>
+    :root {
+      --bg: #f4efe7;
+      --surface: rgba(255, 250, 243, 0.88);
+      --surface-strong: #fffaf2;
+      --text: #1c1a17;
+      --muted: #6c665f;
+      --line: rgba(87, 70, 49, 0.16);
+      --accent: #0f766e;
+      --accent-2: #c95f37;
+      --shadow: 0 22px 60px rgba(70, 50, 22, 0.14);
+      --radius: 24px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.15), transparent 35%),
+        radial-gradient(circle at top right, rgba(201, 95, 55, 0.18), transparent 28%),
+        linear-gradient(180deg, #f7f2ea 0%, var(--bg) 100%);
+    }
+
+    .shell {
+      width: min(980px, calc(100vw - 28px));
+      margin: 28px auto;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      background: rgba(255, 255, 255, 0.42);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      border-radius: var(--radius);
+      background:
+        linear-gradient(135deg, rgba(15, 118, 110, 0.92), rgba(14, 96, 88, 0.84)),
+        linear-gradient(135deg, rgba(201, 95, 55, 0.2), transparent);
+      color: #fff;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 620px;
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .controls, .results {
+      display: grid;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .controls {
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent-2);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .muted {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    label {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    input[type="date"] {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--surface-strong);
+      font: inherit;
+      color: var(--text);
+    }
+
+    .checkbox {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 15px 18px;
+      font: inherit;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 140ms ease, opacity 140ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: progress;
+      transform: none;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--accent-2), #e07f4f);
+    }
+
+    .secondary {
+      background: linear-gradient(135deg, var(--accent), #139287);
+    }
+
+    .status {
+      min-height: 46px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.45);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .result-card {
+      background: rgba(255, 251, 247, 0.92);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+
+    .result-card h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .stat {
+      padding: 14px;
+      border-radius: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat strong {
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .text-block {
+      white-space: pre-wrap;
+      line-height: 1.65;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .meta {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        margin: 14px auto;
+        padding: 14px;
+        border-radius: 24px;
+      }
+
+      .hero, .card, .result-card {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow" style="color: rgba(255,255,255,0.72);">Garmin AI</div>
+      <h1>Panel ręcznej synchronizacji</h1>
+      <p>Po treningu odpalasz jedną akcję, a backend sam robi pełny sync i dopiero potem generuje wynik na świeżych danych.</p>
+    </section>
+
+    <section class="controls">
+      <article class="card">
+        <div class="eyebrow">Akcja 01</div>
+        <h2>Generuj raport teraz</h2>
+        <p class="muted">Najpierw pełna synchronizacja, potem gotowość, analiza i raport AI.</p>
+        <div class="field">
+          <label for="report-date">Data</label>
+          <input id="report-date" type="date">
+        </div>
+        <label class="checkbox">
+          <input id="send-notifications" type="checkbox">
+          <span>Wyślij też email / WhatsApp</span>
+        </label>
+        <button id="run-report" class="primary">Generuj świeży raport</button>
+      </article>
+
+      <article class="card">
+        <div class="eyebrow">Akcja 02</div>
+        <h2>Proponuj trening</h2>
+        <p class="muted">Też robi pełny sync, więc uwzględnia nowy trening i aktualny Body Battery.</p>
+        <div class="field">
+          <label for="training-date">Data</label>
+          <input id="training-date" type="date">
+        </div>
+        <label class="checkbox">
+          <input id="send-training-email" type="checkbox">
+          <span>Wyślij propozycję także na email</span>
+        </label>
+        <button id="run-training" class="secondary">Zaproponuj trening</button>
+      </article>
+    </section>
+
+    <section class="results">
+      <div id="status" class="status">Panel gotowy.</div>
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <script>
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById("report-date").value = today;
+    document.getElementById("training-date").value = today;
+
+    const statusNode = document.getElementById("status");
+    const resultNode = document.getElementById("result");
+    const reportButton = document.getElementById("run-report");
+    const trainingButton = document.getElementById("run-training");
+
+    function setBusy(isBusy, label) {
+      reportButton.disabled = isBusy;
+      trainingButton.disabled = isBusy;
+      statusNode.textContent = label;
+    }
+
+    function renderReport(data) {
+      const readiness = data.readiness || {};
+      const sleep = data.sleep || {};
+      const hrv = data.hrv || {};
+      const insight = data.insight || "Brak insightu AI.";
+      const sync = data.sync || {};
+
+      resultNode.innerHTML = `
+        <article class="result-card">
+          <div class="eyebrow">Świeży raport</div>
+          <h3>${data.date}</h3>
+          <div class="stats">
+            <div class="stat"><span>Gotowość</span><strong>${readiness.readiness_score ?? "-"}/100</strong></div>
+            <div class="stat"><span>Kategoria</span><strong>${readiness.category ?? "-"}</strong></div>
+            <div class="stat"><span>Sen 7 dni</span><strong>${Number(sleep.average_duration_hours || 0).toFixed(1)} h</strong></div>
+            <div class="stat"><span>HRV trend</span><strong>${hrv.trend ?? "-"}</strong></div>
+          </div>
+          <div class="text-block">${insight}</div>
+          <div class="meta">
+            Sync: ${sync.synced_days ?? 0} dni, ${sync.synced_recent_activities ?? 0} nowych ostatnich aktywności,
+            ${sync.synced_target_day_activities ?? 0} nowych aktywności dla dnia docelowego.
+          </div>
+        </article>
+      `;
+    }
+
+    function renderTraining(data) {
+      const readiness = data.readiness || {};
+      const bodyBattery = data.body_battery || {};
+      const activities = data.today_activities || [];
+      const suggestion = data.suggestion || "Brak odpowiedzi AI. Sprawdź OPENAI_API_KEY.";
+      const sync = data.sync || {};
+
+      resultNode.innerHTML = `
+        <article class="result-card">
+          <div class="eyebrow">Świeża propozycja</div>
+          <h3>${data.day_name} • ${data.date}</h3>
+          <div class="stats">
+            <div class="stat"><span>Body Battery</span><strong>${bodyBattery.value ?? "-"}</strong></div>
+            <div class="stat"><span>Trend BB</span><strong>${bodyBattery.trend || "-"}</strong></div>
+            <div class="stat"><span>Gotowość</span><strong>${readiness.readiness_score ?? "-"}/100</strong></div>
+            <div class="stat"><span>Treningi dziś</span><strong>${activities.length}</strong></div>
+          </div>
+          <div class="text-block">${suggestion}</div>
+          <div class="meta">
+            Plan: ${data.planned_workout || "brak"}<br>
+            Sync: ${sync.synced_days ?? 0} dni, ${sync.synced_recent_activities ?? 0} nowych ostatnich aktywności,
+            ${sync.synced_target_day_activities ?? 0} nowych aktywności dla dnia docelowego.
+          </div>
+        </article>
+      `;
+    }
+
+    async function runAction(url, payload, renderer, busyLabel, doneLabel) {
+      setBusy(true, busyLabel);
+      resultNode.innerHTML = "";
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Nieznany błąd");
+        }
+
+        renderer(data);
+        statusNode.textContent = doneLabel;
+      } catch (error) {
+        statusNode.textContent = `Błąd: ${error.message}`;
+      } finally {
+        setBusy(false, statusNode.textContent);
+      }
+    }
+
+    reportButton.addEventListener("click", () => {
+      runAction(
+        "/api/v1/actions/report",
+        {
+          target_date: document.getElementById("report-date").value,
+          send_notifications: document.getElementById("send-notifications").checked,
+        },
+        renderReport,
+        "Trwa pełny sync i generowanie raportu...",
+        "Raport gotowy."
+      );
+    });
+
+    trainingButton.addEventListener("click", () => {
+      runAction(
+        "/api/v1/actions/training-suggestion",
+        {
+          target_date: document.getElementById("training-date").value,
+          send_email: document.getElementById("send-training-email").checked,
+        },
+        renderTraining,
+        "Trwa pełny sync i generowanie propozycji treningowej...",
+        "Propozycja treningowa gotowa."
+      );
+    });
+  </script>
+</body>
+</html>

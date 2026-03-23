@@ -89,6 +89,9 @@ Instalacja zależności:
 Skopiuj przykładowy plik i uzupełnij dane:
 ```bash
 cp .env.example .env
+cp user_context.md.example user_context.md
+cp training_plan.md.example training_plan.md
+cp agent_notes.md.example agent_notes.md
 ```
 
 Minimalna konfiguracja:
@@ -97,6 +100,8 @@ GARMIN_EMAIL=twoj_email@example.com
 GARMIN_PASSWORD=twoje_haslo
 OPENAI_API_KEY=sk-your-api-key
 ```
+
+> `user_context.md`, `training_plan.md` i `agent_notes.md` są ignorowane przez Git. Trzymaj tam swoje prywatne dane i własny plan treningowy.
 
 ### 3. Konfiguracja 2FA Garmin (jednorazowo)
 
@@ -129,12 +134,160 @@ Skrypt:
 
 # Generowanie raportu
 .venv/bin/python3 scripts/generate_daily_report.py
+
+# Propozycja treningu
+.venv/bin/python3 scripts/suggest_training.py
+
+# Panel webowy
+.venv/bin/uvicorn app.api.main:app --host 0.0.0.0 --port 8000
 ```
 
 **Windows:**
 ```bat
 .venv\Scripts\python scripts/run_daily_sync.py
 .venv\Scripts\python scripts/generate_daily_report.py
+.venv\Scripts\python scripts/suggest_training.py
+.venv\Scripts\uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+```
+
+Po uruchomieniu API otwórz:
+
+- `http://localhost:8000` lokalnie
+- `http://IP_TWOJEGO_SERWERA:8000` z telefonu w tej samej sieci
+
+Panel udostępnia dwa ręczne przyciski:
+- `Generuj świeży raport`
+- `Zaproponuj trening`
+
+Obie akcje najpierw robią **pełny sync**, a dopiero potem generują wynik. Dzięki temu raport i sugestia treningowa bazują na świeżych danych i widzą nową aktywność wykonaną chwilę wcześniej.
+
+## 💻 Szybki start lokalnie
+
+Jeśli chcesz po prostu uruchomić serwis lokalnie bez Dockera:
+
+```bash
+git clone <twoje_repo>
+cd garmin-ai
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env
+cp user_context.md.example user_context.md
+cp training_plan.md.example training_plan.md
+cp agent_notes.md.example agent_notes.md
+```
+
+Następnie:
+1. Uzupełnij `.env`
+2. Jeśli Garmin ma 2FA, uruchom `./.venv/bin/python3 scripts/setup_garmin_2fa.py`
+3. Zrób pierwszy sync: `./.venv/bin/python3 scripts/run_daily_sync.py`
+4. Odpal panel: `./.venv/bin/uvicorn app.api.main:app --host 0.0.0.0 --port 8000`
+
+## 🐧 Ubuntu + `systemd`
+
+Jeśli masz osobny serwer Ubuntu, najprostsza i najstabilniejsza opcja to uruchomienie API jako usługi systemowej.
+
+> Na dedykowanym serwerze możesz spokojnie działać **bez `venv`**. W takiej konfiguracji instalujesz zależności globalnie i uruchamiasz skrypty po prostu przez `python3`.
+
+### 1. Instalacja na serwerze
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-pip
+
+cd /opt
+sudo git clone <twoje_repo> garmin-ai
+sudo chown -R $USER:$USER /opt/garmin-ai
+
+cd /opt/garmin-ai
+python3 -m pip install -r requirements.txt
+cp .env.example .env
+cp user_context.md.example user_context.md
+cp training_plan.md.example training_plan.md
+cp agent_notes.md.example agent_notes.md
+```
+
+Uzupełnij `/opt/garmin-ai/.env`, a jeśli używasz 2FA Garmin:
+
+```bash
+cd /opt/garmin-ai
+python3 scripts/setup_garmin_2fa.py
+```
+
+### 2. Test ręczny
+
+```bash
+cd /opt/garmin-ai
+python3 scripts/run_daily_sync.py
+python3 -m uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+```
+
+Jeśli wszystko działa, zatrzymaj proces `Ctrl+C` i przejdź do usługi.
+
+### 3. Plik usługi
+
+Utwórz plik `/etc/systemd/system/garmin-ai.service`:
+
+```ini
+[Unit]
+Description=Garmin AI FastAPI service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/garmin-ai
+EnvironmentFile=/opt/garmin-ai/.env
+ExecStart=/usr/bin/python3 -m uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Zamień `User=ubuntu` na użytkownika, pod którym trzymasz projekt na serwerze.
+
+### 4. Start usługi
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable garmin-ai
+sudo systemctl start garmin-ai
+sudo systemctl status garmin-ai
+```
+
+Logi:
+
+```bash
+journalctl -u garmin-ai -f
+```
+
+### 5. Firewall
+
+Jeśli używasz `ufw`, odblokuj port:
+
+```bash
+sudo ufw allow 8000/tcp
+```
+
+Potem panel będzie dostępny pod:
+
+```text
+http://IP_SERWERA:8000
+```
+
+### 6. Automatyczny codzienny sync
+
+Najprościej dodać cron pod tym samym użytkownikiem:
+
+```bash
+crontab -e
+```
+
+Przykład codziennie o 06:00:
+
+```cron
+0 6 * * * cd /opt/garmin-ai && python3 scripts/run_daily_sync.py >> /opt/garmin-ai/logs/cron_sync.log 2>&1
 ```
 
 ## 👤 Personalizacja profilu (`user_context.md`)
@@ -280,6 +433,8 @@ Oba raporty to responsywny **HTML email** z:
 
 ## ⚙️ Automatyzacja
 
+Skrypty `generate_daily_report.py` i `suggest_training.py` przed analizą wykonują teraz pełną synchronizację, więc ręczne uruchomienie z panelu lub crona nie generuje odpowiedzi na starych danych.
+
 ### Linux / macOS (cron)
 
 ```bash
@@ -403,4 +558,3 @@ logs/daily_report.log     # Generowanie raportu
 - [garminconnect](https://github.com/cyberjunky/python-garminconnect) — Python API dla Garmin Connect
 - [OpenAI](https://openai.com/) — API dla funkcji AI
 - [Twilio](https://www.twilio.com/) — WhatsApp API
-

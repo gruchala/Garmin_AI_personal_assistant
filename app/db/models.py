@@ -1,5 +1,6 @@
 """Modele bazy danych SQLAlchemy"""
 
+import os
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, JSON, Boolean, Text
@@ -289,7 +290,13 @@ def init_db(database_url: str = "sqlite:///garmin_data.db"):
     Returns:
         Tuple (engine, SessionLocal)
     """
-    engine = create_engine(database_url, echo=False)
+    resolved_database_url = os.getenv("DATABASE_URL", database_url)
+    engine_kwargs = {"echo": False}
+
+    if resolved_database_url.startswith("sqlite"):
+        engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+    engine = create_engine(resolved_database_url, **engine_kwargs)
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
     

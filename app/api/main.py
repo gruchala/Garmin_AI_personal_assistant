@@ -4,8 +4,12 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from dotenv import load_dotenv
 from .routes import router
 from ..db.models import init_db
+
+load_dotenv()
 
 # Konfiguracja logowania
 logging.basicConfig(
@@ -58,11 +62,7 @@ app.include_router(router, prefix="/api/v1")
 @app.get("/")
 async def root():
     """Endpoint główny"""
-    return {
-        "message": "Garmin AI Analytics API",
-        "version": "0.1.0",
-        "status": "running"
-    }
+    return RedirectResponse(url="/api/v1/dashboard")
 
 
 @app.get("/health")

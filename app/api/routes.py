@@ -2,8 +2,10 @@
 
 import logging
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -15,10 +17,12 @@ from ..processors.recovery_score import RecoveryScore
 from ..processors.sleep_metrics import SleepMetrics
 from ..processors.hrv_metrics import HRVMetrics
 from ..ai.insights import InsightsGenerator, InsightsAssistant
+from ..services.workflows import build_daily_report, build_training_suggestion
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+dashboard_path = Path(__file__).with_name("dashboard.html")
 
 
 # === MODELE PYDANTIC ===
@@ -41,6 +45,18 @@ class TrainingQuestion(BaseModel):
     question: str
 
 
+class ReportActionRequest(BaseModel):
+    """Request do świeżego raportu"""
+    target_date: Optional[str] = None
+    send_notifications: bool = False
+
+
+class TrainingSuggestionRequest(BaseModel):
+    """Request do świeżej propozycji treningowej"""
+    target_date: Optional[str] = None
+    send_email: bool = False
+
+
 # === DEPENDENCY INJECTION ===
 
 def get_db_session():
@@ -56,6 +72,19 @@ def get_db_session():
             session.close()
     
     return _get_session
+
+
+def parse_target_date(raw_date: Optional[str]) -> date:
+    """Parsuje opcjonalną datę z requestu."""
+    if not raw_date:
+        return date.today()
+    return datetime.strptime(raw_date, "%Y-%m-%d").date()
+
+
+@router.get("/dashboard", include_in_schema=False)
+async def dashboard():
+    """Prosty panel webowy do ręcznych akcji."""
+    return FileResponse(dashboard_path)
 
 
 # === ENDPOINTY SYNCHRONIZACJI ===
@@ -119,6 +148,44 @@ async def sync_activities(
         
     except Exception as e:
         logger.error(f"Błąd podczas synchronizacji aktywności: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/actions/report")
+async def generate_fresh_report(
+    action_request: ReportActionRequest,
+    session: Session = Depends(get_db_session())
+):
+    """Robi pełny sync i generuje świeży raport."""
+    try:
+        target_date = parse_target_date(action_request.target_date)
+        repo = GarminRepository(session)
+        return build_daily_report(
+            repository=repo,
+            target_date=target_date,
+            send_notifications=action_request.send_notifications,
+        )
+    except Exception as e:
+        logger.error(f"Błąd podczas generowania świeżego raportu: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/actions/training-suggestion")
+async def generate_fresh_training_suggestion(
+    action_request: TrainingSuggestionRequest,
+    session: Session = Depends(get_db_session())
+):
+    """Robi pełny sync i generuje świeżą propozycję treningową."""
+    try:
+        target_date = parse_target_date(action_request.target_date)
+        repo = GarminRepository(session)
+        return build_training_suggestion(
+            repository=repo,
+            target_date=target_date,
+            send_email=action_request.send_email,
+        )
+    except Exception as e:
+        logger.error(f"Błąd podczas generowania propozycji treningowej: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
