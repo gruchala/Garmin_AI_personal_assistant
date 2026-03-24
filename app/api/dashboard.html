@@ -234,6 +234,266 @@
       font-size: 13px;
     }
 
+    .editor-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    select,
+    input[type="file"],
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface-strong);
+      font: inherit;
+      color: var(--text);
+    }
+
+    select,
+    input[type="file"] {
+      padding: 12px 14px;
+    }
+
+    textarea {
+      min-height: 420px;
+      padding: 16px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .button-row button {
+      width: auto;
+      min-width: 160px;
+    }
+
+    .ghost {
+      background: linear-gradient(135deg, #94775f, #7e6552);
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.55);
+      padding: 16px;
+    }
+
+    .panel h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .file-hint {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .preview {
+      min-height: 420px;
+      overflow: auto;
+      line-height: 1.65;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .preview h1,
+    .preview h2,
+    .preview h3 {
+      margin-top: 0;
+      letter-spacing: -0.02em;
+    }
+
+    .preview h1 {
+      font-size: 30px;
+      margin-bottom: 18px;
+    }
+
+    .preview h2 {
+      font-size: 22px;
+      margin: 26px 0 12px;
+    }
+
+    .preview h3 {
+      font-size: 18px;
+      margin: 20px 0 10px;
+    }
+
+    .preview p {
+      margin: 0 0 12px;
+    }
+
+    .preview ul {
+      margin: 0 0 12px 18px;
+      padding: 0;
+    }
+
+    .preview ol {
+      margin: 0 0 12px 22px;
+      padding: 0;
+    }
+
+    .preview li {
+      margin-bottom: 6px;
+    }
+
+    .preview a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(15, 118, 110, 0.24);
+    }
+
+    .preview a:hover {
+      border-bottom-color: rgba(15, 118, 110, 0.7);
+    }
+
+    .preview blockquote {
+      margin: 0 0 16px;
+      padding: 10px 16px;
+      border-left: 4px solid var(--accent-2);
+      background: rgba(201, 95, 55, 0.08);
+      color: #4b433d;
+      border-radius: 0 14px 14px 0;
+    }
+
+    .preview hr {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 20px 0;
+    }
+
+    .preview code {
+      font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+      font-size: 0.92em;
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: rgba(15, 118, 110, 0.08);
+      color: #0d5f59;
+    }
+
+    .preview pre {
+      margin: 0 0 16px;
+      padding: 14px 16px;
+      overflow: auto;
+      border-radius: 16px;
+      background: #1d2428;
+      color: #edf6f8;
+    }
+
+    .preview pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    .preview .codehilite {
+      margin: 0 0 16px;
+      border-radius: 16px;
+      overflow: auto;
+      background: #1d2428;
+    }
+
+    .preview .codehilite pre {
+      margin: 0;
+    }
+
+    .preview .codehilite .k,
+    .preview .codehilite .kd,
+    .preview .codehilite .kn {
+      color: #f59e0b;
+    }
+
+    .preview .codehilite .s,
+    .preview .codehilite .sa,
+    .preview .codehilite .s2 {
+      color: #86efac;
+    }
+
+    .preview .codehilite .c,
+    .preview .codehilite .c1 {
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    .preview .codehilite .nf,
+    .preview .codehilite .nc {
+      color: #7dd3fc;
+    }
+
+    .preview .codehilite .o,
+    .preview .codehilite .ow {
+      color: #fda4af;
+    }
+
+    .preview .codehilite .mi,
+    .preview .codehilite .mf {
+      color: #c4b5fd;
+    }
+
+    .preview table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 16px;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+    }
+
+    .preview th,
+    .preview td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .preview th {
+      background: rgba(15, 118, 110, 0.08);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .preview tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .preview strong {
+      color: #0f5c57;
+    }
+
+    .preview img {
+      max-width: 100%;
+      border-radius: 14px;
+    }
+
+    .editor-status {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 20px;
+    }
+
     @media (max-width: 640px) {
       .shell {
         margin: 14px auto;
@@ -243,6 +503,14 @@
 
       .hero, .card, .result-card {
         padding: 18px;
+      }
+
+      .editor-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .button-row button {
+        width: 100%;
       }
     }
   </style>
@@ -291,6 +559,40 @@
       <div id="status" class="status">Panel gotowy.</div>
       <div id="result"></div>
     </section>
+
+    <section class="card" style="margin-top: 18px;">
+      <div class="eyebrow">Akcja 03</div>
+      <h2>Edytor plików agenta</h2>
+      <p class="muted">Możesz podejrzeć i zmieniać pliki, które agent czyta albo sam uzupełnia. Działa dla Markdown i zwykłego tekstu.</p>
+
+      <div class="field">
+        <label for="file-select">Plik</label>
+        <select id="file-select"></select>
+      </div>
+
+      <div class="editor-toolbar">
+        <input id="local-file" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain">
+      </div>
+
+      <div class="editor-grid">
+        <div class="panel">
+          <h3>Edycja</h3>
+          <div id="file-description" class="file-hint">Ładowanie listy plików...</div>
+          <textarea id="file-editor" placeholder="Tutaj pojawi się treść pliku."></textarea>
+          <div class="button-row">
+            <button id="reload-file" class="ghost" type="button">Odśwież z dysku</button>
+            <button id="save-file" class="secondary" type="button">Zapisz plik</button>
+          </div>
+          <div id="editor-status" class="editor-status"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Podgląd</h3>
+          <div id="preview-label" class="file-hint">Prosty render Markdown, a dla `.txt` zwykły tekst.</div>
+          <div id="file-preview" class="preview"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -302,11 +604,166 @@
     const resultNode = document.getElementById("result");
     const reportButton = document.getElementById("run-report");
     const trainingButton = document.getElementById("run-training");
+    const fileSelect = document.getElementById("file-select");
+    const fileDescription = document.getElementById("file-description");
+    const fileEditor = document.getElementById("file-editor");
+    const filePreview = document.getElementById("file-preview");
+    const previewLabel = document.getElementById("preview-label");
+    const editorStatus = document.getElementById("editor-status");
+    const saveFileButton = document.getElementById("save-file");
+    const reloadFileButton = document.getElementById("reload-file");
+    const localFileInput = document.getElementById("local-file");
+    let fileCatalog = [];
+    let previewRequestVersion = 0;
+    let livePreviewTimer = null;
 
     function setBusy(isBusy, label) {
       reportButton.disabled = isBusy;
       trainingButton.disabled = isBusy;
       statusNode.textContent = label;
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function renderPlainPreview(content) {
+      filePreview.innerHTML = `<pre style="margin: 0; white-space: pre-wrap; font: inherit;">${escapeHtml(content)}</pre>`;
+    }
+
+    function renderEditorPreview(kind, content, previewHtml) {
+      if (kind === "markdown" && previewHtml) {
+        filePreview.innerHTML = previewHtml;
+        previewLabel.textContent = "Render Markdown na podstawie aktualnej treści z renderera serwera.";
+      } else {
+        renderPlainPreview(content);
+        previewLabel.textContent = "Podgląd tekstowy dla zwykłego pliku lub lokalnej wersji roboczej.";
+      }
+    }
+
+    function getSelectedKind() {
+      const selectedName = fileSelect.value;
+      return fileCatalog.find((file) => file.name === selectedName)?.kind || "text";
+    }
+
+    async function refreshLivePreview() {
+      const kind = getSelectedKind();
+      if (kind !== "markdown") {
+        renderPlainPreview(fileEditor.value);
+        previewLabel.textContent = "Podgląd tekstowy dla zwykłego pliku lub lokalnej wersji roboczej.";
+        return;
+      }
+
+      const currentVersion = ++previewRequestVersion;
+
+      try {
+        const response = await fetch("/api/v1/files/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: fileEditor.value,
+            kind,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Nie udało się wyrenderować podglądu");
+        }
+
+        if (currentVersion !== previewRequestVersion) {
+          return;
+        }
+
+        renderEditorPreview(kind, fileEditor.value, data.preview_html || "");
+      } catch (error) {
+        if (currentVersion !== previewRequestVersion) {
+          return;
+        }
+        renderPlainPreview(fileEditor.value);
+        previewLabel.textContent = "Podgląd awaryjny tekstu, bo renderer zwrócił błąd.";
+        editorStatus.textContent = `Błąd podglądu: ${error.message}`;
+      }
+    }
+
+    function scheduleLivePreview() {
+      if (livePreviewTimer) {
+        clearTimeout(livePreviewTimer);
+      }
+      livePreviewTimer = setTimeout(() => {
+        refreshLivePreview();
+      }, 220);
+    }
+
+    async function loadFileCatalog() {
+      const response = await fetch("/api/v1/files");
+      const data = await response.json();
+      fileCatalog = data.files || [];
+
+      fileSelect.innerHTML = fileCatalog.map((file) => `
+        <option value="${file.name}">${file.label} • ${file.name}</option>
+      `).join("");
+
+      if (fileCatalog.length) {
+        await loadSelectedFile();
+      } else {
+        fileDescription.textContent = "Brak plików skonfigurowanych do edycji.";
+        editorStatus.textContent = "";
+      }
+    }
+
+    async function loadSelectedFile() {
+      const selectedName = fileSelect.value;
+      if (!selectedName) {
+        return;
+      }
+
+      editorStatus.textContent = "Ładowanie pliku...";
+      const response = await fetch(`/api/v1/files/${encodeURIComponent(selectedName)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Nie udało się odczytać pliku");
+      }
+
+      fileEditor.value = data.content || "";
+      fileDescription.textContent = `${data.description} ${data.exists ? `Ostatnia zmiana: ${data.updated_at || "brak danych"}.` : "Plik jeszcze nie istnieje, zapis go utworzy."}`;
+      renderEditorPreview(data.kind, data.content || "", data.preview_html || "");
+      editorStatus.textContent = `Załadowano ${data.name}.`;
+    }
+
+    async function saveSelectedFile() {
+      const selectedName = fileSelect.value;
+      if (!selectedName) {
+        return;
+      }
+
+      editorStatus.textContent = "Zapisywanie pliku...";
+      saveFileButton.disabled = true;
+      reloadFileButton.disabled = true;
+
+      try {
+        const response = await fetch(`/api/v1/files/${encodeURIComponent(selectedName)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: fileEditor.value }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Nie udało się zapisać pliku");
+        }
+
+        const currentMeta = fileCatalog.find((file) => file.name === selectedName);
+        renderEditorPreview(currentMeta?.kind || "text", fileEditor.value, data.preview_html || "");
+        editorStatus.textContent = `${data.message}. Ostatnia zmiana: ${data.updated_at}.`;
+      } finally {
+        saveFileButton.disabled = false;
+        reloadFileButton.disabled = false;
+      }
     }
 
     function renderReport(data) {
@@ -411,6 +868,53 @@
         "Trwa pełny sync i generowanie propozycji treningowej...",
         "Propozycja treningowa gotowa."
       );
+    });
+
+    fileSelect.addEventListener("change", async () => {
+      try {
+        await loadSelectedFile();
+      } catch (error) {
+        editorStatus.textContent = `Błąd: ${error.message}`;
+      }
+    });
+
+    reloadFileButton.addEventListener("click", async () => {
+      try {
+        await loadSelectedFile();
+      } catch (error) {
+        editorStatus.textContent = `Błąd: ${error.message}`;
+      }
+    });
+
+    saveFileButton.addEventListener("click", async () => {
+      try {
+        await saveSelectedFile();
+      } catch (error) {
+        editorStatus.textContent = `Błąd: ${error.message}`;
+      }
+    });
+
+    fileEditor.addEventListener("input", () => {
+      editorStatus.textContent = "Masz niezapisane zmiany.";
+      scheduleLivePreview();
+    });
+
+    localFileInput.addEventListener("change", async (event) => {
+      const [file] = event.target.files || [];
+      if (!file) {
+        return;
+      }
+
+      const text = await file.text();
+      fileEditor.value = text;
+      previewLabel.textContent = `Wczytano lokalny plik: ${file.name}. Zapis nadpisze aktualnie wybrany plik z serwera.`;
+      editorStatus.textContent = `Wczytano lokalny plik ${file.name} do edytora.`;
+      scheduleLivePreview();
+    });
+
+    loadFileCatalog().catch((error) => {
+      fileDescription.textContent = "Nie udało się pobrać listy plików.";
+      editorStatus.textContent = `Błąd: ${error.message}`;
     });
   </script>
 </body>

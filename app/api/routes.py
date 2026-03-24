@@ -1,9 +1,11 @@
 """Routy API"""
 
 import logging
+from html import escape
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
+import markdown
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -23,6 +25,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 dashboard_path = Path(__file__).with_name("dashboard.html")
+project_root = Path(__file__).resolve().parents[2]
+editable_files = {
+    "user_context.md": {
+        "path": project_root / "user_context.md",
+        "label": "Profil użytkownika",
+        "kind": "markdown",
+        "description": "Plik z profilem i ograniczeniami treningowymi użytkownika.",
+    },
+    "training_plan.md": {
+        "path": project_root / "training_plan.md",
+        "label": "Plan treningowy",
+        "kind": "markdown",
+        "description": "Tygodniowy plan i notatki do sugestii treningowych.",
+    },
+    "agent_notes.md": {
+        "path": project_root / "agent_notes.md",
+        "label": "Notes agenta",
+        "kind": "markdown",
+        "description": "Długoterminowe notatki, które agent sam dopisuje po analizie.",
+    },
+}
 
 
 # === MODELE PYDANTIC ===
@@ -57,6 +80,49 @@ class TrainingSuggestionRequest(BaseModel):
     send_email: bool = False
 
 
+class FileUpdateRequest(BaseModel):
+    """Request do zapisu pliku tekstowego/markdown."""
+    content: str
+
+
+class FilePreviewRequest(BaseModel):
+    """Request do renderowania podglądu Markdown bez zapisu."""
+    content: str
+    kind: str = "markdown"
+
+
+def get_editable_file_or_404(file_name: str) -> dict:
+    """Zwraca konfigurację dozwolonego pliku albo 404."""
+    file_info = editable_files.get(file_name)
+    if not file_info:
+        raise HTTPException(status_code=404, detail="Taki plik nie jest dostępny w edytorze")
+    return file_info
+
+
+def render_markdown_preview(content: str) -> str:
+    """Renderuje Markdown do bezpiecznego podglądu HTML w panelu."""
+    safe_content = escape(content)
+    return markdown.markdown(
+        safe_content,
+        extensions=[
+            "extra",
+            "fenced_code",
+            "tables",
+            "sane_lists",
+            "nl2br",
+            "codehilite",
+        ],
+        extension_configs={
+            "codehilite": {
+                "guess_lang": False,
+                "linenums": False,
+                "css_class": "codehilite",
+            }
+        },
+        output_format="html5",
+    )
+
+
 # === DEPENDENCY INJECTION ===
 
 def get_db_session():
@@ -85,6 +151,73 @@ def parse_target_date(raw_date: Optional[str]) -> date:
 async def dashboard():
     """Prosty panel webowy do ręcznych akcji."""
     return FileResponse(dashboard_path)
+
+
+@router.get("/files")
+async def list_editable_files():
+    """Zwraca listę plików dostępnych w prostym edytorze."""
+    files = []
+    for name, info in editable_files.items():
+        path = info["path"]
+        files.append({
+            "name": name,
+            "label": info["label"],
+            "kind": info["kind"],
+            "description": info["description"],
+            "exists": path.exists(),
+            "size": path.stat().st_size if path.exists() else 0,
+        })
+    return {"files": files}
+
+
+@router.get("/files/{file_name}")
+async def get_editable_file(file_name: str):
+    """Odczytuje plik dostępny w edytorze."""
+    file_info = get_editable_file_or_404(file_name)
+    path = file_info["path"]
+
+    content = path.read_text(encoding="utf-8") if path.exists() else ""
+    return {
+        "name": file_name,
+        "label": file_info["label"],
+        "kind": file_info["kind"],
+        "description": file_info["description"],
+        "exists": path.exists(),
+        "content": content,
+        "preview_html": render_markdown_preview(content),
+        "updated_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat() if path.exists() else None,
+    }
+
+
+@router.post("/files/preview")
+async def preview_editable_file(payload: FilePreviewRequest):
+    """Renderuje roboczy podgląd pliku bez zapisywania na dysk."""
+    if payload.kind == "markdown":
+        preview_html = render_markdown_preview(payload.content)
+    else:
+        preview_html = f"<pre>{escape(payload.content)}</pre>"
+
+    return {
+        "kind": payload.kind,
+        "preview_html": preview_html,
+    }
+
+
+@router.put("/files/{file_name}")
+async def save_editable_file(file_name: str, payload: FileUpdateRequest):
+    """Zapisuje plik dostępny w edytorze."""
+    file_info = get_editable_file_or_404(file_name)
+    path = file_info["path"]
+    path.write_text(payload.content, encoding="utf-8")
+
+    return {
+        "status": "success",
+        "name": file_name,
+        "message": f"Zapisano {file_name}",
+        "preview_html": render_markdown_preview(payload.content),
+        "updated_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
+        "size": path.stat().st_size,
+    }
 
 
 # === ENDPOINTY SYNCHRONIZACJI ===
