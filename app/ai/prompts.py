@@ -72,6 +72,7 @@ def get_training_suggestion_prompt(data: Dict[str, Any]) -> str:
 
     sleep_today_str = f"{sleep_today_hours:.1f} h" if sleep_today_hours else "brak danych"
     sleep_avg_str   = f"{sleep.get('average_duration_hours', '?')} h" if sleep.get('average_duration_hours') else "brak"
+    quick_note = data.get('quick_note', '')
 
     return f"""Dzień tygodnia: {day_name}
 Kolejność dni tygodnia: Poniedziałek → Wtorek → Środa → Czwartek → Piątek → Sobota → Niedziela.
@@ -94,6 +95,9 @@ HISTORIA TRENINGÓW (poprzednie 6 dni):
 
 ZASADY Z PLANU TRENINGOWEGO:
 {training_plan_notes}
+
+UWAGA OD UŻYTKOWNIKA NA DZIŚ:
+{quick_note if quick_note else "(brak)"}
 
 INSTRUKCJE:
 1. Uwzględnij treningi wykonane DZIŚ — jeśli coś już było, oceń co POZOSTAŁO do zrobienia (np. popołudniowy trening).
@@ -188,6 +192,9 @@ HRV:
 {body_section}
 AKTYWNOŚCI:
 {_format_activities(activities)}
+
+UWAGA OD UŻYTKOWNIKA NA DZIŚ:
+{data.get('quick_note') or "(brak)"}
 
 Stwórz krótkie, praktyczne podsumowanie dnia ze szczególnym uwzględnieniem gotowości do treningu."""
     

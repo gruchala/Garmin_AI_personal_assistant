@@ -144,7 +144,8 @@ class InsightsGenerator:
         hrv_trend: Dict[str, Any],
         activities: list,
         weight_data: Optional[Dict[str, Any]] = None,
-        vo2max_data: Optional[Dict[str, Any]] = None
+        vo2max_data: Optional[Dict[str, Any]] = None,
+        quick_note: Optional[str] = None,
     ) -> Optional[str]:
         """
         Generuje dzienne podsumowanie
@@ -170,9 +171,10 @@ class InsightsGenerator:
                 'hrv_trend': hrv_trend,
                 'activities': activities,
                 'weight': weight_data or {},
-                'vo2max': vo2max_data or {}
+                'vo2max': vo2max_data or {},
+                'quick_note': quick_note or '',
             }
-            
+
             prompt = get_daily_summary_prompt(data)
             
             response = self.client.chat.completions.create(
@@ -208,6 +210,7 @@ class InsightsGenerator:
         prev_activities: list = None,
         recent_activities: list = None,
         training_plan_notes: str = "",
+        quick_note: Optional[str] = None,
     ) -> Optional[str]:
         """Generuje spersonalizowaną propozycję treningu na dziś."""
         if not self.client:
@@ -226,6 +229,7 @@ class InsightsGenerator:
                 'today_activities': today_activities or [],
                 'prev_activities': prev_activities or recent_activities or [],
                 'training_plan_notes': training_plan_notes,
+                'quick_note': quick_note or '',
             }
             prompt = get_training_suggestion_prompt(data)
             response = self.client.chat.completions.create(
@@ -490,7 +494,7 @@ class InsightsAssistant:
         self.repo = repository
         self.ai = insights_generator
     
-    def get_daily_insight(self, target_date: Optional[date] = None) -> Optional[str]:
+    def get_daily_insight(self, target_date: Optional[date] = None, quick_note: Optional[str] = None) -> Optional[str]:
         """
         Generuje insight dla konkretnego dnia
         
@@ -545,7 +549,8 @@ class InsightsAssistant:
             hrv_trend=hrv_trend,
             activities=activities,
             weight_data=weight_data,
-            vo2max_data=vo2max_data
+            vo2max_data=vo2max_data,
+            quick_note=quick_note,
         )
 
         # Zapisz do bazy

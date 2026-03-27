@@ -168,6 +168,7 @@ def build_daily_report(
     repository: GarminRepository,
     target_date: Optional[date] = None,
     send_notifications: bool = False,
+    quick_note: Optional[str] = None,
 ) -> dict[str, Any]:
     """Generuje świeży raport dzienny po pełnej synchronizacji."""
     target_date = target_date or date.today()
@@ -186,7 +187,7 @@ def build_daily_report(
 
     ai = InsightsGenerator()
     assistant = InsightsAssistant(repository, ai)
-    insight = assistant.get_daily_insight(target_date) if ai.client else None
+    insight = assistant.get_daily_insight(target_date, quick_note=quick_note) if ai.client else None
 
     latest_weight = repository.get_latest_weight()
     latest_vo2 = repository.get_latest_vo2max()
@@ -243,6 +244,7 @@ def build_training_suggestion(
     repository: GarminRepository,
     target_date: Optional[date] = None,
     send_email: bool = False,
+    quick_note: Optional[str] = None,
 ) -> dict[str, Any]:
     """Generuje świeżą propozycję treningową po pełnym syncu."""
     target_date = target_date or date.today()
@@ -297,6 +299,7 @@ def build_training_suggestion(
             today_activities=today_activities,
             prev_activities=previous_activities,
             training_plan_notes=training_plan_notes,
+            quick_note=quick_note,
         )
 
     email_sent = False

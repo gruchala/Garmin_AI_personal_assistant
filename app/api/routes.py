@@ -72,12 +72,14 @@ class ReportActionRequest(BaseModel):
     """Request do świeżego raportu"""
     target_date: Optional[str] = None
     send_notifications: bool = False
+    quick_note: Optional[str] = None
 
 
 class TrainingSuggestionRequest(BaseModel):
     """Request do świeżej propozycji treningowej"""
     target_date: Optional[str] = None
     send_email: bool = False
+    quick_note: Optional[str] = None
 
 
 class FileUpdateRequest(BaseModel):
@@ -297,6 +299,7 @@ async def generate_fresh_report(
             repository=repo,
             target_date=target_date,
             send_notifications=action_request.send_notifications,
+            quick_note=action_request.quick_note,
         )
     except Exception as e:
         logger.error(f"Błąd podczas generowania świeżego raportu: {e}", exc_info=True)
@@ -316,6 +319,7 @@ async def generate_fresh_training_suggestion(
             repository=repo,
             target_date=target_date,
             send_email=action_request.send_email,
+            quick_note=action_request.quick_note,
         )
     except Exception as e:
         logger.error(f"Błąd podczas generowania propozycji treningowej: {e}", exc_info=True)

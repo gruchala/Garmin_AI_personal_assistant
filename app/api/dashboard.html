@@ -523,6 +523,17 @@
       <p>Po treningu odpalasz jedną akcję, a backend sam robi pełny sync i dopiero potem generuje wynik na świeżych danych.</p>
     </section>
 
+    <section class="card" style="margin-top: 18px;">
+      <div class="eyebrow">Uwaga na dziś</div>
+      <input
+        id="quick-note"
+        type="text"
+        placeholder="np. dzisiaj jestem słaby, boli mnie kolano, mało spałem…"
+        style="width:100%; padding:14px 16px; border-radius:14px; border:1px solid var(--line); background:var(--surface-strong); font:inherit; color:var(--text);"
+      >
+      <p class="muted" style="margin:8px 0 0;">Opcjonalnie. Uwaga zostanie przekazana do AI przy generowaniu raportu lub treningu — nie modyfikuje plików kontekstu.</p>
+    </section>
+
     <section class="controls">
       <article class="card">
         <div class="eyebrow">Akcja 01</div>
@@ -850,6 +861,7 @@
         {
           target_date: document.getElementById("report-date").value,
           send_notifications: document.getElementById("send-notifications").checked,
+          quick_note: document.getElementById("quick-note").value.trim() || null,
         },
         renderReport,
         "Trwa pełny sync i generowanie raportu...",
@@ -863,6 +875,7 @@
         {
           target_date: document.getElementById("training-date").value,
           send_email: document.getElementById("send-training-email").checked,
+          quick_note: document.getElementById("quick-note").value.trim() || null,
         },
         renderTraining,
         "Trwa pełny sync i generowanie propozycji treningowej...",
