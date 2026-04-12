@@ -5,6 +5,7 @@ import os
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Optional
+import re
 from dotenv import load_dotenv
 
 from ..ai.insights import InsightsAssistant, InsightsGenerator
@@ -23,6 +24,8 @@ from ..processors.sleep_metrics import SleepMetrics
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 load_dotenv()
 
 DAY_NAMES_PL = {
@@ -38,12 +41,14 @@ DAY_NAMES_PL = {
 
 def load_training_plan(plan_file: str = "training_plan.md") -> dict[str, str]:
     """Parsuje plan treningowy z pliku markdown."""
-    path = Path(plan_file)
+    path = PROJECT_ROOT / plan_file
     if not path.exists():
         logger.warning("Brak pliku %s — uruchamiam bez planu", plan_file)
         return {}
 
     content = path.read_text(encoding="utf-8")
+    content = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
+    
     plan: dict[str, list[str]] = {}
     current_day: Optional[str] = None
     notes_section: list[str] = []
@@ -51,7 +56,7 @@ def load_training_plan(plan_file: str = "training_plan.md") -> dict[str, str]:
 
     for line in content.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("<!--"):
+        if not stripped:
             continue
 
         if stripped.startswith("## "):

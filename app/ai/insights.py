@@ -5,6 +5,7 @@ import os
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional
+import re
 from openai import OpenAI
 from .prompts import (
     SYSTEM_PROMPT,
@@ -19,20 +20,21 @@ from .prompts import (
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-def load_agent_notes(notes_file: str = "agent_notes.md", max_entries: int = 30) -> Optional[str]:
+
+def load_agent_notes(notes_file: str = "agent_notes.md", max_entries: int = 14) -> Optional[str]:
     """
     Ładuje notatki agenta (notatnik trenera).
     Zwraca ostatnie `max_entries` wpisów aby nie przeładować kontekstu.
     """
-    path = Path(notes_file)
+    path = PROJECT_ROOT / notes_file
     if not path.exists():
         return None
     content = path.read_text(encoding="utf-8").strip()
     if not content:
         return None
     # Podziel na wpisy po separatorze '## YYYY-MM-DD'
-    import re
     entries = re.split(r'(?=^## \d{4}-\d{2}-\d{2})', content, flags=re.MULTILINE)
     entries = [e.strip() for e in entries if e.strip() and not e.startswith('#!')]
     if not entries:
@@ -43,7 +45,7 @@ def load_agent_notes(notes_file: str = "agent_notes.md", max_entries: int = 30) 
 
 def append_agent_note(note: str, notes_file: str = "agent_notes.md", target_date: str = "") -> None:
     """Dopisuje datowaną notatkę do pliku notatnika agenta."""
-    path = Path(notes_file)
+    path = PROJECT_ROOT / notes_file
     header = f"\n\n## {target_date}\n" if target_date else "\n\n---\n"
     with path.open("a", encoding="utf-8") as f:
         f.write(header + note.strip() + "\n")
@@ -53,18 +55,31 @@ def append_agent_note(note: str, notes_file: str = "agent_notes.md", target_date
 def load_user_context(context_file: str = "user_context.md") -> Optional[str]:
     """
     Ładuje plik z kontekstem użytkownika.
-    Zwraca None jeśli plik nie istnieje lub jest pusty (same komentarze).
+    Zwraca None jeśli plik nie istnieje lub jest pusty.
     """
-    path = Path(context_file)
+    path = PROJECT_ROOT / context_file
     if not path.exists():
         return None
     
     content = path.read_text(encoding="utf-8").strip()
-    # Usuń linie będące tylko komentarzami HTML lub puste
-    meaningful = [
-        line for line in content.splitlines()
-        if line.strip() and not line.strip().startswith("<!--") and not line.strip() == "-->"
-    ]
+    # Usuń całkowicie komentarze HTML (wielolinijkowe i jednolinijkowe)
+    content = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
+    
+    meaningful = [line for line in content.splitlines() if line.strip()]
+    return "\n".join(meaningful) if meaningful else None
+
+def load_training_plan_raw(plan_file: str = "training_plan.md") -> Optional[str]:
+    """
+    Ładuje surowy plik planu treningowego, usuwając tylko komentarze.
+    """
+    path = PROJECT_ROOT / plan_file
+    if not path.exists():
+        return None
+        
+    content = path.read_text(encoding="utf-8").strip()
+    content = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
+    
+    meaningful = [line for line in content.splitlines() if line.strip()]
     return "\n".join(meaningful) if meaningful else None
 
 
@@ -85,11 +100,15 @@ class InsightsGenerator:
         
         user_context = load_user_context(context_file)
         agent_notes = load_agent_notes()
+        training_plan = load_training_plan_raw()
 
         self.system_prompt = SYSTEM_PROMPT
         if user_context:
             self.system_prompt += f"\n\n## Profil użytkownika\n{user_context}"
             logger.info("Załadowano profil użytkownika z user_context.md")
+        if training_plan:
+            self.system_prompt += f"\n\n## Plan treningowy\n{training_plan}"
+            logger.info("Załadowano bazowy plan treningowy z training_plan.md do systemu")
         if agent_notes:
             self.system_prompt += f"\n\n## Notatki trenera (poprzednie sesje)\n{agent_notes}"
             logger.info("Załadowano notatki trenera z agent_notes.md")
