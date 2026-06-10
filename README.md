@@ -99,9 +99,12 @@ Minimalna konfiguracja:
 GARMIN_EMAIL=twoj_email@example.com
 GARMIN_PASSWORD=twoje_haslo
 OPENAI_API_KEY=sk-your-api-key
+RAW_DATA_STORAGE=essential
 ```
 
 > `user_context.md`, `training_plan.md` i `agent_notes.md` są ignorowane przez Git. Trzymaj tam swoje prywatne dane i własny plan treningowy.
+> Dla SQLite na serwerze zalecane jest `RAW_DATA_STORAGE=essential`, żeby baza nie rosła tak szybko przez pełne payloady Garmin w `raw_data`.
+> Aktywności i ich szczegóły są zawsze zapisywane w pełnej postaci, ponieważ pola różnią się zależnie od sportu.
 
 ### 3. Konfiguracja 2FA Garmin (jednorazowo)
 
@@ -503,6 +506,13 @@ Tabele:
 - `body_weight` — masa ciała i skład ciała
 - `vo2max_data` — dane VO2max
 - `ai_insights` — insighty i podsumowania z AI
+
+Po aktualizacji istniejącej instalacji możesz jednorazowo uzupełnić nowe kolumny
+z zapisanych payloadów treningowych:
+
+```bash
+python3 scripts/backfill_activity_metrics.py
+```
 
 Opcjonalnie PostgreSQL:
 ```env

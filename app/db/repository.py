@@ -1,8 +1,10 @@
 """Repozytorium do operacji na bazie danych"""
 
 import logging
+import os
 from datetime import date, datetime
 from typing import List, Dict, Any, Optional
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 from .models import (
     DailyMetrics, SleepSession, HRVData, RestingHeartRate,
@@ -22,6 +24,220 @@ class GarminRepository:
             session: Sesja SQLAlchemy
         """
         self.session = session
+        self.raw_data_mode = self._detect_raw_data_mode()
+
+    def _detect_raw_data_mode(self) -> str:
+        """Dobiera strategię przechowywania raw_data.
+
+        Tryby:
+        - full: zapis pełnego payloadu
+        - essential: zapis tylko pól potrzebnych aplikacji
+        - none: brak zapisu raw_data
+        """
+        configured = os.getenv("RAW_DATA_STORAGE", "").strip().lower()
+        if configured in {"full", "essential", "none"}:
+            return configured
+
+        bind = self.session.get_bind()
+        if bind is not None and inspect(bind).dialect.name == "sqlite":
+            return "essential"
+        return "full"
+
+    def _prepare_raw_data(self, dataset: str, data: Any) -> Any:
+        """Normalizuje payload do rozmiaru akceptowalnego dla wybranego backendu."""
+        if self.raw_data_mode == "none":
+            return None
+        # Aktywności są najbardziej zróżnicowanym zbiorem Garmin. Pełny payload
+        # zachowuje pola specyficzne dla biegu, roweru, siły, pływania itd.
+        if dataset in {"activity", "activity_detail"}:
+            return data
+        if self.raw_data_mode == "full":
+            return data
+
+        compactor = {
+            "daily_metrics": self._compact_daily_metrics,
+            "sleep": self._compact_sleep_data,
+            "hrv": self._compact_hrv_data,
+            "activity": self._compact_activity_data,
+            "activity_detail": self._compact_activity_detail_data,
+            "weight": self._compact_weight_data,
+            "vo2max": self._compact_vo2max_data,
+        }.get(dataset)
+
+        if compactor is None:
+            return data
+        return compactor(data)
+
+    @staticmethod
+    def _compact_daily_metrics(data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "calendarDate": data.get("calendarDate"),
+            "totalSteps": data.get("totalSteps"),
+            "totalDistanceMeters": data.get("totalDistanceMeters"),
+            "totalKilocalories": data.get("totalKilocalories"),
+            "activeKilocalories": data.get("activeKilocalories"),
+            "bmrKilocalories": data.get("bmrKilocalories"),
+            "moderateIntensityMinutes": data.get("moderateIntensityMinutes"),
+            "vigorousIntensityMinutes": data.get("vigorousIntensityMinutes"),
+        }
+
+    @staticmethod
+    def _compact_sleep_data(data: Dict[str, Any]) -> Dict[str, Any]:
+        dto = data.get("dailySleepDTO", {})
+        return {
+            "dailySleepDTO": {
+                "sleepTimeSeconds": dto.get("sleepTimeSeconds"),
+                "napTimeSeconds": dto.get("napTimeSeconds"),
+                "deepSleepSeconds": dto.get("deepSleepSeconds"),
+                "lightSleepSeconds": dto.get("lightSleepSeconds"),
+                "remSleepSeconds": dto.get("remSleepSeconds"),
+                "awakeSleepSeconds": dto.get("awakeSleepSeconds"),
+                "sleepScores": dto.get("sleepScores"),
+                "awakeCount": dto.get("awakeCount"),
+                "avgSleepStress": dto.get("avgSleepStress"),
+                "averageRespirationValue": dto.get("averageRespirationValue"),
+                "lowestRespirationValue": dto.get("lowestRespirationValue"),
+                "highestRespirationValue": dto.get("highestRespirationValue"),
+                "averageSpO2Value": dto.get("averageSpO2Value"),
+                "lowestSpO2Value": dto.get("lowestSpO2Value"),
+                "sleepStartTimestampLocal": dto.get("sleepStartTimestampLocal"),
+                "sleepEndTimestampLocal": dto.get("sleepEndTimestampLocal"),
+            }
+        }
+
+    @staticmethod
+    def _compact_hrv_data(data: Dict[str, Any]) -> Dict[str, Any]:
+        summary = data.get("hrvSummary", {})
+        return {
+            "hrvSummary": {
+                "weeklyAvg": summary.get("weeklyAvg"),
+                "lastNightAvg": summary.get("lastNightAvg"),
+                "lastNight5MinHigh": summary.get("lastNight5MinHigh"),
+                "status": summary.get("status"),
+            }
+        }
+
+    @staticmethod
+    def _compact_activity_data(data: Dict[str, Any]) -> Dict[str, Any]:
+        activity_type = data.get("activityType", {})
+        return {
+            "activityId": data.get("activityId"),
+            "activityName": data.get("activityName"),
+            "activityType": {
+                "typeKey": activity_type.get("typeKey") if isinstance(activity_type, dict) else activity_type
+            },
+            "startTimeLocal": data.get("startTimeLocal"),
+            "distance": data.get("distance"),
+            "duration": data.get("duration"),
+            "movingDuration": data.get("movingDuration"),
+            "elapsedDuration": data.get("elapsedDuration"),
+            "averageHR": data.get("averageHR"),
+            "maxHR": data.get("maxHR"),
+            "calories": data.get("calories"),
+            "averageSpeed": data.get("averageSpeed"),
+            "maxSpeed": data.get("maxSpeed"),
+            "elevationGain": data.get("elevationGain"),
+            "elevationLoss": data.get("elevationLoss"),
+            "aerobicTrainingEffect": data.get("aerobicTrainingEffect"),
+            "anaerobicTrainingEffect": data.get("anaerobicTrainingEffect"),
+        }
+
+    @staticmethod
+    def _compact_activity_detail_data(data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "timeInHeartRateZones": data.get("timeInHeartRateZones"),
+            "avgRunningCadence": data.get("avgRunningCadence"),
+            "maxRunningCadence": data.get("maxRunningCadence"),
+            "avgStrideLength": data.get("avgStrideLength"),
+            "vO2MaxValue": data.get("vO2MaxValue"),
+        }
+
+    @staticmethod
+    def _compact_weight_data(data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "weight": data.get("weight"),
+            "bmi": data.get("bmi"),
+            "bodyFat": data.get("bodyFat"),
+            "bodyWater": data.get("bodyWater"),
+            "muscleMass": data.get("muscleMass"),
+            "boneMass": data.get("boneMass"),
+        }
+
+    @staticmethod
+    def _compact_vo2max_data(data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "vo2MaxPreciseValue": data.get("vo2MaxPreciseValue"),
+            "vo2MaxValue": data.get("vo2MaxValue"),
+            "fitnessAge": data.get("fitnessAge"),
+        }
+
+    @staticmethod
+    def _daily_metrics_to_dict(metric: DailyMetrics) -> Dict[str, Any]:
+        return {
+            "calendarDate": metric.date.isoformat() if metric.date else None,
+            "totalSteps": metric.total_steps,
+            "totalDistanceMeters": metric.total_distance_meters,
+            "totalKilocalories": metric.total_calories,
+            "activeKilocalories": metric.active_calories,
+            "moderateIntensityMinutes": metric.moderate_intensity_minutes,
+            "vigorousIntensityMinutes": metric.vigorous_intensity_minutes,
+        }
+
+    @staticmethod
+    def _sleep_to_dict(sleep: SleepSession) -> Dict[str, Any]:
+        return {
+            "dailySleepDTO": {
+                "sleepTimeSeconds": sleep.sleep_time_seconds,
+                "napTimeSeconds": sleep.nap_time_seconds,
+                "deepSleepSeconds": sleep.deep_sleep_seconds,
+                "lightSleepSeconds": sleep.light_sleep_seconds,
+                "remSleepSeconds": sleep.rem_sleep_seconds,
+                "awakeSleepSeconds": sleep.awake_seconds,
+                "sleepScores": sleep.sleep_scores,
+                "awakeCount": sleep.awake_count,
+                "avgSleepStress": sleep.avg_sleep_stress,
+                "averageRespirationValue": sleep.avg_respiration_value,
+                "lowestRespirationValue": sleep.lowest_respiration_value,
+                "highestRespirationValue": sleep.highest_respiration_value,
+                "averageSpO2Value": sleep.avg_spo2_value,
+                "lowestSpO2Value": sleep.lowest_spo2_value,
+                "sleepStartTimestampLocal": sleep.sleep_start_timestamp.isoformat() if sleep.sleep_start_timestamp else None,
+                "sleepEndTimestampLocal": sleep.sleep_end_timestamp.isoformat() if sleep.sleep_end_timestamp else None,
+            }
+        }
+
+    @staticmethod
+    def _hrv_to_dict(hrv: HRVData) -> Dict[str, Any]:
+        return {
+            "hrvSummary": {
+                "weeklyAvg": hrv.weekly_avg,
+                "lastNightAvg": hrv.last_night_avg,
+                "lastNight5MinHigh": hrv.last_night_5_min_high,
+                "status": hrv.status,
+            }
+        }
+
+    @staticmethod
+    def _activity_to_dict(activity: Activity) -> Dict[str, Any]:
+        return {
+            "activityId": activity.activity_id,
+            "activityName": activity.activity_name,
+            "activityType": {"typeKey": activity.activity_type},
+            "startTimeLocal": activity.start_time_local.strftime("%Y-%m-%d %H:%M:%S") if activity.start_time_local else None,
+            "distance": activity.distance,
+            "duration": activity.duration,
+            "movingDuration": activity.moving_duration,
+            "elapsedDuration": activity.elapsed_duration,
+            "elevationGain": activity.elevation_gain,
+            "elevationLoss": activity.elevation_loss,
+            "averageHR": activity.average_hr,
+            "maxHR": activity.max_hr,
+            "averageSpeed": activity.average_speed,
+            "maxSpeed": activity.max_speed,
+            "calories": activity.calories,
+            "aerobicTrainingEffect": activity.aerobic_training_effect,
+            "anaerobicTrainingEffect": activity.anaerobic_training_effect,
+        }
     
     # === DAILY METRICS ===
     
@@ -40,7 +256,7 @@ class GarminRepository:
         metric.active_calories = data.get('activeKilocalories')
         metric.moderate_intensity_minutes = data.get('moderateIntensityMinutes')
         metric.vigorous_intensity_minutes = data.get('vigorousIntensityMinutes')
-        metric.raw_data = data
+        metric.raw_data = self._prepare_raw_data("daily_metrics", data)
         
         self.session.commit()
         logger.info(f"Zapisano metryki dzienne dla {target_date}")
@@ -113,7 +329,7 @@ class GarminRepository:
         sleep.avg_spo2_value = _get('averageSpO2Value') or _get('avgSpo2Value')
         sleep.lowest_spo2_value = _get('lowestSpO2Value') or _get('lowestSpo2Value')
         
-        sleep.raw_data = data
+        sleep.raw_data = self._prepare_raw_data("sleep", data)
         
         self.session.commit()
         logger.info(f"Zapisano dane o śnie dla {target_date}")
@@ -122,7 +338,10 @@ class GarminRepository:
     def get_sleep_data_for_date(self, target_date: date) -> Optional[Dict[str, Any]]:
         """Pobiera dane o śnie dla konkretnej daty"""
         sleep = self.session.query(SleepSession).filter_by(date=target_date).first()
-        return self._normalize_sleep(sleep.raw_data) if sleep else None
+        if not sleep:
+            return None
+        raw_data = sleep.raw_data or self._sleep_to_dict(sleep)
+        return self._normalize_sleep(raw_data)
     
     def get_sleep_data_range(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """Pobiera dane o śnie dla zakresu dat"""
@@ -131,7 +350,7 @@ class GarminRepository:
             SleepSession.date <= end_date
         ).order_by(SleepSession.date).all()
         
-        return [self._normalize_sleep(s.raw_data) for s in sessions if s.raw_data]
+        return [self._normalize_sleep(s.raw_data or self._sleep_to_dict(s)) for s in sessions]
     
     # === HRV DATA ===
     
@@ -157,7 +376,7 @@ class GarminRepository:
         hrv.last_night_avg = summary.get('lastNightAvg') or data.get('lastNightAvg')
         hrv.last_night_5_min_high = summary.get('lastNight5MinHigh') or data.get('lastNight5MinHigh')
         hrv.status = summary.get('status') or data.get('status')
-        hrv.raw_data = data
+        hrv.raw_data = self._prepare_raw_data("hrv", data)
         
         self.session.commit()
         logger.info(f"Zapisano dane HRV dla {target_date}")
@@ -166,7 +385,10 @@ class GarminRepository:
     def get_hrv_data_for_date(self, target_date: date) -> Optional[Dict[str, Any]]:
         """Pobiera dane HRV dla konkretnej daty"""
         hrv = self.session.query(HRVData).filter_by(date=target_date).first()
-        return self._normalize_hrv(hrv.raw_data) if hrv else None
+        if not hrv:
+            return None
+        raw_data = hrv.raw_data or self._hrv_to_dict(hrv)
+        return self._normalize_hrv(raw_data)
     
     def get_hrv_data_range(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """Pobiera dane HRV dla zakresu dat"""
@@ -175,7 +397,7 @@ class GarminRepository:
             HRVData.date <= end_date
         ).order_by(HRVData.date).all()
         
-        return [self._normalize_hrv(h.raw_data) for h in hrv_records if h.raw_data]
+        return [self._normalize_hrv(h.raw_data or self._hrv_to_dict(h)) for h in hrv_records]
     
     # === RESTING HEART RATE ===
     
@@ -265,11 +487,21 @@ class GarminRepository:
         # Typ aktywności
         activity_type = data.get('activityType', {})
         activity.activity_type = activity_type.get('typeKey') if isinstance(activity_type, dict) else str(activity_type)
+        activity.sport_type_id = data.get('sportTypeId')
+        activity.time_zone_id = data.get('timeZoneId')
+        event_type = data.get('eventType', {})
+        activity.event_type = event_type.get('typeKey') if isinstance(event_type, dict) else event_type
+        activity.device_id = data.get('deviceId')
+        activity.manufacturer = data.get('manufacturer')
+        activity.location_name = data.get('locationName')
         
         # Czas
         start_time = data.get('startTimeLocal')
         if start_time:
-            activity.start_time_local = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            activity.start_time_local = self._parse_activity_datetime(start_time)
+        start_time_gmt = data.get('startTimeGMT')
+        if start_time_gmt:
+            activity.start_time_gmt = self._parse_activity_datetime(start_time_gmt)
         
         # Metryki
         activity.distance = data.get('distance')
@@ -280,27 +512,108 @@ class GarminRepository:
         # Wysokość
         activity.elevation_gain = data.get('elevationGain')
         activity.elevation_loss = data.get('elevationLoss')
+        activity.min_elevation = data.get('minElevation')
+        activity.max_elevation = data.get('maxElevation')
+        activity.avg_elevation = data.get('avgElevation')
         
         # Tętno
         activity.average_hr = data.get('averageHR')
         activity.max_hr = data.get('maxHR')
+        activity.min_hr = data.get('minHR')
+        activity.recovery_hr = data.get('recoveryHeartRate')
         
         # Prędkość
         activity.average_speed = data.get('averageSpeed')
         activity.max_speed = data.get('maxSpeed')
+        activity.avg_grade_adjusted_speed = data.get('avgGradeAdjustedSpeed')
         
         # Kalorie
         activity.calories = data.get('calories')
+        activity.bmr_calories = data.get('bmrCalories')
+        activity.steps = data.get('steps')
         
         # Training effect
-        activity.aerobic_training_effect = data.get('aerobicTrainingEffect')
+        activity.aerobic_training_effect = data.get('aerobicTrainingEffect') or data.get('trainingEffect')
         activity.anaerobic_training_effect = data.get('anaerobicTrainingEffect')
+        activity.training_effect_label = data.get('trainingEffectLabel')
+        activity.aerobic_training_effect_message = data.get('aerobicTrainingEffectMessage')
+        activity.anaerobic_training_effect_message = data.get('anaerobicTrainingEffectMessage')
+        activity.activity_training_load = data.get('activityTrainingLoad')
+
+        activity.avg_running_cadence = (
+            data.get('averageRunningCadenceInStepsPerMinute')
+            or data.get('averageRunCadence')
+            or data.get('avgRunningCadence')
+        )
+        activity.max_running_cadence = (
+            data.get('maxRunningCadenceInStepsPerMinute')
+            or data.get('maxRunCadence')
+            or data.get('maxRunningCadence')
+        )
+        activity.avg_biking_cadence = data.get('averageBikingCadenceInRevPerMinute') or data.get('averageBikeCadence')
+        activity.max_biking_cadence = data.get('maxBikingCadenceInRevPerMinute') or data.get('maxBikeCadence')
+        activity.avg_stride_length = data.get('avgStrideLength') or data.get('strideLength')
+        activity.avg_ground_contact_time = data.get('avgGroundContactTime') or data.get('groundContactTime')
+        activity.avg_ground_contact_balance = data.get('avgGroundContactBalance') or data.get('groundContactBalanceLeft')
+        activity.avg_vertical_oscillation = data.get('avgVerticalOscillation') or data.get('verticalOscillation')
+        activity.avg_vertical_ratio = data.get('avgVerticalRatio') or data.get('verticalRatio')
+
+        activity.avg_power = data.get('avgPower') or data.get('averagePower')
+        activity.max_power = data.get('maxPower')
+        activity.normalized_power = data.get('normPower') or data.get('normalizedPower')
+        activity.training_stress_score = data.get('trainingStressScore')
+        activity.intensity_factor = data.get('intensityFactor')
+        activity.total_work = data.get('totalWork')
+
+        activity.avg_respiration_rate = data.get('avgRespirationRate')
+        activity.min_respiration_rate = data.get('minRespirationRate')
+        activity.max_respiration_rate = data.get('maxRespirationRate')
+        activity.avg_temperature = data.get('averageTemperature')
+        activity.min_temperature = data.get('minTemperature')
+        activity.max_temperature = data.get('maxTemperature')
+        activity.avg_stress = data.get('avgStress')
+        activity.start_stress = data.get('startStress')
+        activity.end_stress = data.get('endStress')
+        activity.max_stress = data.get('maxStress')
+        activity.difference_stress = data.get('differenceStress')
+        activity.difference_body_battery = data.get('differenceBodyBattery')
+        activity.begin_potential_stamina = data.get('beginPotentialStamina')
+        activity.end_potential_stamina = data.get('endPotentialStamina')
+        activity.min_available_stamina = data.get('minAvailableStamina')
+
+        activity.moderate_intensity_minutes = data.get('moderateIntensityMinutes')
+        activity.vigorous_intensity_minutes = data.get('vigorousIntensityMinutes')
+        activity.active_sets = data.get('activeSets')
+        activity.total_sets = data.get('totalSets')
+        activity.total_reps = data.get('totalReps') or data.get('totalExerciseReps')
+        activity.lap_count = data.get('lapCount')
+
+        activity.start_latitude = data.get('startLatitude')
+        activity.start_longitude = data.get('startLongitude')
+        activity.end_latitude = data.get('endLatitude')
+        activity.end_longitude = data.get('endLongitude')
         
-        activity.raw_data = data
+        activity.raw_data = self._prepare_raw_data("activity", data)
         
         self.session.commit()
         logger.info(f"Zapisano aktywność {activity_id}")
         return activity
+
+    @staticmethod
+    def _parse_activity_datetime(value: Any) -> datetime:
+        """Obsługuje formaty czasu zwracane przez listę i szczegóły Garmin."""
+        raw_value = str(value)
+        for date_format in (
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M:%S.%f",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f",
+        ):
+            try:
+                return datetime.strptime(raw_value, date_format)
+            except ValueError:
+                continue
+        return datetime.fromisoformat(raw_value.replace('Z', '+00:00'))
     
     def save_activity_details(self, activity_id: int, data: Dict[str, Any]) -> ActivityDetail:
         """Zapisuje szczegóły aktywności"""
@@ -310,20 +623,46 @@ class GarminRepository:
             detail = ActivityDetail(activity_id=activity_id)
             self.session.add(detail)
         
-        # Strefy tętna
+        summary = data.get('summaryDTO', data)
+        metrics = dict(summary) if isinstance(summary, dict) else {}
+
+        # Szczegół Garmin zawiera część parametrów, których nie ma na liście
+        # aktywności. Scal je z rekordem głównym, zachowując jego metadane.
+        activity = self.session.query(Activity).filter_by(activity_id=activity_id).first()
+        if activity and isinstance(summary, dict):
+            if isinstance(activity.raw_data, dict):
+                metrics = {**activity.raw_data, **summary}
+            merged_activity = {
+                **metrics,
+                "activityId": activity_id,
+                "activityName": activity.activity_name,
+                "activityType": {"typeKey": activity.activity_type},
+            }
+            self.save_activity(merged_activity)
+
+        # Garmin zwraca strefy jako listę albo osobne pola hrTimeInZone_N.
         time_in_zones = data.get('timeInHeartRateZones', [])
-        for i, zone_time in enumerate(time_in_zones[:6]):
+        for i in range(6):
+            zone_time = time_in_zones[i] if i < len(time_in_zones) else metrics.get(f'hrTimeInZone_{i}')
             setattr(detail, f'time_in_hr_zone_{i}', zone_time)
         
         # Kadencja
-        detail.avg_running_cadence = data.get('avgRunningCadence')
-        detail.max_running_cadence = data.get('maxRunningCadence')
-        detail.avg_stride_length = data.get('avgStrideLength')
+        detail.avg_running_cadence = (
+            metrics.get('averageRunningCadenceInStepsPerMinute')
+            or metrics.get('averageRunCadence')
+            or metrics.get('avgRunningCadence')
+        )
+        detail.max_running_cadence = (
+            metrics.get('maxRunningCadenceInStepsPerMinute')
+            or metrics.get('maxRunCadence')
+            or metrics.get('maxRunningCadence')
+        )
+        detail.avg_stride_length = metrics.get('strideLength') or metrics.get('avgStrideLength')
         
         # VO2 Max
-        detail.vo2_max_value = data.get('vO2MaxValue')
+        detail.vo2_max_value = metrics.get('vO2MaxValue')
         
-        detail.raw_data = data
+        detail.raw_data = self._prepare_raw_data("activity_detail", data)
         
         self.session.commit()
         logger.info(f"Zapisano szczegóły aktywności {activity_id}")
@@ -332,6 +671,11 @@ class GarminRepository:
     def activity_exists(self, activity_id: int) -> bool:
         """Sprawdza czy aktywność istnieje w bazie"""
         return self.session.query(Activity).filter_by(activity_id=activity_id).count() > 0
+
+    def activity_detail_needs_refresh(self, activity_id: int) -> bool:
+        """Sprawdza, czy brak pełnego payloadu szczegółów aktywności."""
+        detail = self.session.query(ActivityDetail).filter_by(activity_id=activity_id).first()
+        return not detail or not isinstance(detail.raw_data, dict) or 'summaryDTO' not in detail.raw_data
     
     def get_activities_in_date_range(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """Pobiera aktywności z zakresu dat"""
@@ -340,7 +684,7 @@ class GarminRepository:
             Activity.start_time_local <= datetime.combine(end_date, datetime.max.time())
         ).order_by(Activity.start_time_local).all()
         
-        return [a.raw_data for a in activities if a.raw_data]
+        return [a.raw_data or self._activity_to_dict(a) for a in activities]
     
     # === RECOVERY METRICS ===
     
@@ -422,7 +766,7 @@ class GarminRepository:
         record.body_water_percent = data.get('bodyWater')
         record.muscle_mass_grams = data.get('muscleMass')
         record.bone_mass_grams = data.get('boneMass')
-        record.raw_data = data
+        record.raw_data = self._prepare_raw_data("weight", data)
 
         self.session.commit()
         logger.info(f"Zapisano dane wagowe dla {target_date}")
@@ -452,7 +796,7 @@ class GarminRepository:
         record.vo2max_precise = data.get('vo2MaxPreciseValue')
         record.vo2max_value = data.get('vo2MaxValue')
         record.fitness_age = data.get('fitnessAge')
-        record.raw_data = data
+        record.raw_data = self._prepare_raw_data("vo2max", data)
 
         self.session.commit()
         logger.info(f"Zapisano VO2max dla {target_date}: {data.get('vo2MaxPreciseValue')}")

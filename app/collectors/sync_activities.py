@@ -44,21 +44,20 @@ class ActivitiesSync:
             if not activity_id:
                 continue
             
-            # Sprawdź czy aktywność już istnieje w bazie
-            if self.repo.activity_exists(activity_id):
-                logger.debug(f"Aktywność {activity_id} już istnieje w bazie")
-                continue
-            
-            # Zapisz podstawowe dane aktywności
+            is_new = not self.repo.activity_exists(activity_id)
+
+            # Zawsze odśwież rekord z listy, aby uzupełniać nowe kolumny.
             self.repo.save_activity(activity)
             
-            # Pobierz szczegóły aktywności
-            details = self.client.get_activity_details(activity_id)
-            if details:
-                self.repo.save_activity_details(activity_id, details)
+            # Pełne szczegóły pobierz dla nowych lub wcześniej okrojonych rekordów.
+            if self.repo.activity_detail_needs_refresh(activity_id):
+                details = self.client.get_activity_details(activity_id)
+                if details:
+                    self.repo.save_activity_details(activity_id, details)
             
-            synced_count += 1
-            logger.info(f"Zsynchronizowano aktywność {activity_id}")
+            if is_new:
+                synced_count += 1
+                logger.info(f"Zsynchronizowano nową aktywność {activity_id}")
         
         logger.info(f"Zsynchronizowano {synced_count} nowych aktywności")
         return synced_count
@@ -95,18 +94,19 @@ class ActivitiesSync:
                 continue
             
             activity_id = activity.get('activityId')
-            if not activity_id or self.repo.activity_exists(activity_id):
+            if not activity_id:
                 continue
-            
-            # Zapisz aktywność
+
+            is_new = not self.repo.activity_exists(activity_id)
             self.repo.save_activity(activity)
             
-            # Pobierz szczegóły
-            details = self.client.get_activity_details(activity_id)
-            if details:
-                self.repo.save_activity_details(activity_id, details)
+            if self.repo.activity_detail_needs_refresh(activity_id):
+                details = self.client.get_activity_details(activity_id)
+                if details:
+                    self.repo.save_activity_details(activity_id, details)
             
-            synced_count += 1
+            if is_new:
+                synced_count += 1
         
         logger.info(f"Zsynchronizowano {synced_count} aktywności dla {target_date}")
         return synced_count

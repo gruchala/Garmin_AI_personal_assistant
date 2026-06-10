@@ -3,7 +3,8 @@
 import os
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, JSON, Boolean, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, JSON, Boolean, Text, inspect, text
+from sqlalchemy.schema import CreateColumn
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -132,7 +133,14 @@ class Activity(Base):
     # Podstawowe informacje
     activity_name = Column(String(255))
     activity_type = Column(String(100))
+    sport_type_id = Column(Integer)
     start_time_local = Column(DateTime, index=True)
+    start_time_gmt = Column(DateTime)
+    time_zone_id = Column(Integer)
+    event_type = Column(String(100))
+    device_id = Column(Integer)
+    manufacturer = Column(String(100))
+    location_name = Column(String(255))
     
     # Metryki
     distance = Column(Float)  # metry
@@ -143,21 +151,83 @@ class Activity(Base):
     # Wysokość
     elevation_gain = Column(Float)
     elevation_loss = Column(Float)
+    min_elevation = Column(Float)
+    max_elevation = Column(Float)
+    avg_elevation = Column(Float)
     
     # Tętno
     average_hr = Column(Integer)
     max_hr = Column(Integer)
+    min_hr = Column(Integer)
+    recovery_hr = Column(Integer)
     
     # Tempo/prędkość
     average_speed = Column(Float)  # m/s
     max_speed = Column(Float)  # m/s
+    avg_grade_adjusted_speed = Column(Float)
     
     # Kalorie
     calories = Column(Integer)
+    bmr_calories = Column(Integer)
+    steps = Column(Integer)
     
     # Training effect
     aerobic_training_effect = Column(Float)
     anaerobic_training_effect = Column(Float)
+    training_effect_label = Column(String(100))
+    aerobic_training_effect_message = Column(String(255))
+    anaerobic_training_effect_message = Column(String(255))
+    activity_training_load = Column(Float)
+
+    # Kadencja i dynamika ruchu
+    avg_running_cadence = Column(Float)
+    max_running_cadence = Column(Float)
+    avg_biking_cadence = Column(Float)
+    max_biking_cadence = Column(Float)
+    avg_stride_length = Column(Float)
+    avg_ground_contact_time = Column(Float)
+    avg_ground_contact_balance = Column(Float)
+    avg_vertical_oscillation = Column(Float)
+    avg_vertical_ratio = Column(Float)
+
+    # Moc
+    avg_power = Column(Float)
+    max_power = Column(Float)
+    normalized_power = Column(Float)
+    training_stress_score = Column(Float)
+    intensity_factor = Column(Float)
+    total_work = Column(Float)
+
+    # Oddech, temperatura, stres i stamina
+    avg_respiration_rate = Column(Float)
+    min_respiration_rate = Column(Float)
+    max_respiration_rate = Column(Float)
+    avg_temperature = Column(Float)
+    min_temperature = Column(Float)
+    max_temperature = Column(Float)
+    avg_stress = Column(Float)
+    start_stress = Column(Float)
+    end_stress = Column(Float)
+    max_stress = Column(Float)
+    difference_stress = Column(Float)
+    difference_body_battery = Column(Integer)
+    begin_potential_stamina = Column(Float)
+    end_potential_stamina = Column(Float)
+    min_available_stamina = Column(Float)
+
+    # Trening siłowy i intensywność
+    moderate_intensity_minutes = Column(Integer)
+    vigorous_intensity_minutes = Column(Integer)
+    active_sets = Column(Integer)
+    total_sets = Column(Integer)
+    total_reps = Column(Integer)
+    lap_count = Column(Integer)
+
+    # Lokalizacja
+    start_latitude = Column(Float)
+    start_longitude = Column(Float)
+    end_latitude = Column(Float)
+    end_longitude = Column(Float)
     
     # Metadata
     raw_data = Column(JSON)
@@ -298,6 +368,27 @@ def init_db(database_url: str = "sqlite:///garmin_data.db"):
 
     engine = create_engine(resolved_database_url, **engine_kwargs)
     Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
     SessionLocal = sessionmaker(bind=engine)
     
     return engine, SessionLocal
+
+
+def _add_missing_columns(engine) -> None:
+    """Dodaje nowe, opcjonalne kolumny bez kasowania istniejących danych."""
+    schema = inspect(engine)
+
+    with engine.begin() as connection:
+        for table in Base.metadata.sorted_tables:
+            if not schema.has_table(table.name):
+                continue
+
+            existing = {column["name"] for column in schema.get_columns(table.name)}
+            quoted_table = engine.dialect.identifier_preparer.quote(table.name)
+
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+
+                column_ddl = str(CreateColumn(column).compile(dialect=engine.dialect))
+                connection.execute(text(f"ALTER TABLE {quoted_table} ADD COLUMN {column_ddl}"))
