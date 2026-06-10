@@ -676,6 +676,98 @@ class GarminRepository:
         """Sprawdza, czy brak pełnego payloadu szczegółów aktywności."""
         detail = self.session.query(ActivityDetail).filter_by(activity_id=activity_id).first()
         return not detail or not isinstance(detail.raw_data, dict) or 'summaryDTO' not in detail.raw_data
+
+    @staticmethod
+    def _serialize_model_columns(record: Any, excluded: Optional[set[str]] = None) -> Dict[str, Any]:
+        """Serializuje wszystkie kolumny modelu SQLAlchemy do JSON-friendly dict."""
+        excluded = excluded or set()
+        result = {}
+
+        for column in record.__table__.columns:
+            if column.name in excluded:
+                continue
+
+            value = getattr(record, column.name)
+            if isinstance(value, (date, datetime)):
+                value = value.isoformat()
+            result[column.name] = value
+
+        return result
+
+    def _activity_document(
+        self,
+        activity: Activity,
+        include_raw: bool = True,
+        include_details: bool = True,
+    ) -> Dict[str, Any]:
+        """Buduje pełny dokument treningu do zwrócenia przez API."""
+        document = self._serialize_model_columns(activity, {"raw_data"})
+
+        if include_raw:
+            document["raw_data"] = activity.raw_data
+
+        if include_details:
+            detail = self.session.query(ActivityDetail).filter_by(
+                activity_id=activity.activity_id
+            ).first()
+            if detail:
+                document["details"] = self._serialize_model_columns(detail, {"raw_data"})
+                if include_raw:
+                    document["details"]["raw_data"] = detail.raw_data
+            else:
+                document["details"] = None
+
+        return document
+
+    def get_activity_document(
+        self,
+        activity_id: int,
+        include_raw: bool = True,
+        include_details: bool = True,
+    ) -> Optional[Dict[str, Any]]:
+        """Pobiera jeden trening wraz ze wszystkimi zapisanymi parametrami."""
+        activity = self.session.query(Activity).filter_by(activity_id=activity_id).first()
+        if not activity:
+            return None
+        return self._activity_document(activity, include_raw, include_details)
+
+    def get_activity_history(
+        self,
+        start_date: date,
+        end_date: date,
+        activity_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        include_raw: bool = True,
+        include_details: bool = True,
+    ) -> Dict[str, Any]:
+        """Pobiera stronicowaną historię treningów z pełnymi parametrami."""
+        query = self.session.query(Activity).filter(
+            Activity.start_time_local >= datetime.combine(start_date, datetime.min.time()),
+            Activity.start_time_local <= datetime.combine(end_date, datetime.max.time()),
+        )
+
+        if activity_type:
+            query = query.filter(Activity.activity_type == activity_type)
+
+        total = query.count()
+        activities = (
+            query.order_by(Activity.start_time_local.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        return {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(activities) < total,
+            "items": [
+                self._activity_document(activity, include_raw, include_details)
+                for activity in activities
+            ],
+        }
     
     def get_activities_in_date_range(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
         """Pobiera aktywności z zakresu dat"""

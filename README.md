@@ -514,6 +514,20 @@ z zapisanych payloadów treningowych:
 python3 scripts/backfill_activity_metrics.py
 ```
 
+Pełna historia treningów jest dostępna przez API:
+
+```text
+GET /api/v1/activities/history?days=90&limit=50&offset=0
+GET /api/v1/activities/history?start_date=2026-01-01&end_date=2026-06-10
+GET /api/v1/activities/history?activity_type=running&include_raw=true
+GET /api/v1/activities/{activity_id}
+```
+
+Odpowiedź zawiera wszystkie kolumny analityczne oraz, domyślnie, pełne
+`raw_data` aktywności i szczegółów Garmin. Dla lżejszej odpowiedzi użyj
+`include_raw=false` albo `include_details=false`. Maksymalny rozmiar strony
+to 200 treningów.
+
 Opcjonalnie PostgreSQL:
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/garmin_ai

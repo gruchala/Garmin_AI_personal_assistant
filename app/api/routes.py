@@ -476,6 +476,81 @@ async def get_activities_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/activities/history")
+async def get_activities_history(
+    days: int = Query(90, ge=1, le=3650),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    activity_type: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    include_raw: bool = True,
+    include_details: bool = True,
+    session: Session = Depends(get_db_session()),
+):
+    """Zwraca historię treningów ze wszystkimi zapisanymi parametrami."""
+    try:
+        parsed_end = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else date.today()
+        parsed_start = (
+            datetime.strptime(start_date, "%Y-%m-%d").date()
+            if start_date
+            else parsed_end - timedelta(days=days - 1)
+        )
+        if parsed_start > parsed_end:
+            raise HTTPException(status_code=422, detail="start_date nie może być późniejsza niż end_date")
+
+        repo = GarminRepository(session)
+        history = repo.get_activity_history(
+            start_date=parsed_start,
+            end_date=parsed_end,
+            activity_type=activity_type,
+            limit=limit,
+            offset=offset,
+            include_raw=include_raw,
+            include_details=include_details,
+        )
+        return {
+            "period": {
+                "start": parsed_start.isoformat(),
+                "end": parsed_end.isoformat(),
+            },
+            "activity_type": activity_type,
+            **history,
+        }
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Daty muszą mieć format YYYY-MM-DD")
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania historii aktywności: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/activities/{activity_id}")
+async def get_activity_details(
+    activity_id: int,
+    include_raw: bool = True,
+    include_details: bool = True,
+    session: Session = Depends(get_db_session()),
+):
+    """Zwraca pełny zapis jednego treningu."""
+    try:
+        repo = GarminRepository(session)
+        activity = repo.get_activity_document(
+            activity_id=activity_id,
+            include_raw=include_raw,
+            include_details=include_details,
+        )
+        if not activity:
+            raise HTTPException(status_code=404, detail="Nie znaleziono aktywności")
+        return activity
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Błąd podczas pobierania aktywności {activity_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # === ENDPOINTY AI ===
 
 @router.get("/insights/daily")
