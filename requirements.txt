@@ -24,3 +24,4 @@ python-dateutil==2.9.0.post0
 requests==2.34.2
 Markdown==3.10.2
 Pygments==2.20.0
+mcp>=1.0.0,<2.0.0
