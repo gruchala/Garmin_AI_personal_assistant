@@ -37,6 +37,17 @@ class BackendConfig:
         return f"{self.backend_url.rstrip('/')}{self.api_base_path}"
 
 
+@dataclass(frozen=True)
+class RuntimeConfig:
+    """Konfiguracja uruchomienia MCP servera."""
+
+    transport: str
+    host: str
+    port: int
+    streamable_http_path: str
+    mount_path: Optional[str]
+
+
 def load_backend_config() -> BackendConfig:
     """Ładuje konfigurację backendu z env."""
     backend_url = os.getenv("MCP_BACKEND_URL", "http://127.0.0.1:8000").strip()
@@ -55,6 +66,38 @@ def load_backend_config() -> BackendConfig:
         api_token=api_token,
         token_header=token_header,
         timeout_seconds=timeout_seconds,
+    )
+
+
+def load_runtime_config() -> RuntimeConfig:
+    """Ładuje konfigurację transportu MCP z env."""
+    transport = (os.getenv("MCP_TRANSPORT", "stdio") or "stdio").strip().lower()
+    allowed_transports = {"stdio", "sse", "streamable-http"}
+    if transport not in allowed_transports:
+        raise ValueError(
+            f"Nieobsługiwany MCP_TRANSPORT='{transport}'. Dozwolone: {sorted(allowed_transports)}"
+        )
+
+    host = (os.getenv("MCP_SERVER_HOST", "127.0.0.1") or "127.0.0.1").strip()
+    port = int((os.getenv("MCP_SERVER_PORT", "8001") or "8001").strip())
+
+    streamable_http_path = (
+        os.getenv("MCP_STREAMABLE_HTTP_PATH", "/mcp") or "/mcp"
+    ).strip()
+    if not streamable_http_path.startswith("/"):
+        streamable_http_path = f"/{streamable_http_path}"
+
+    mount_path_env = (os.getenv("MCP_MOUNT_PATH") or "").strip()
+    mount_path = mount_path_env or None
+    if mount_path and not mount_path.startswith("/"):
+        mount_path = f"/{mount_path}"
+
+    return RuntimeConfig(
+        transport=transport,
+        host=host,
+        port=port,
+        streamable_http_path=streamable_http_path,
+        mount_path=mount_path,
     )
 
 
@@ -127,16 +170,22 @@ def pretty(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
-def create_mcp_server():
+def create_mcp_server(runtime_config: Optional[RuntimeConfig] = None):
     """Buduje instancję MCP servera."""
     if FastMCP is None:
         raise RuntimeError(
             "Brakuje pakietu 'mcp'. Zainstaluj zależności: pip install -r requirements.txt"
         )
 
+    runtime = runtime_config or load_runtime_config()
     config = load_backend_config()
     session = build_session(config)
-    mcp = FastMCP("garmin-ai")
+    mcp = FastMCP(
+        "garmin-ai",
+        host=runtime.host,
+        port=runtime.port,
+        streamable_http_path=runtime.streamable_http_path,
+    )
 
     @mcp.tool()
     def healthcheck() -> dict[str, Any]:
@@ -287,8 +336,9 @@ def create_mcp_server():
 
 def main() -> None:
     """Uruchamia MCP server."""
-    server = create_mcp_server()
-    server.run()
+    runtime = load_runtime_config()
+    server = create_mcp_server(runtime)
+    server.run(transport=runtime.transport, mount_path=runtime.mount_path)
 
 
 if __name__ == "__main__":

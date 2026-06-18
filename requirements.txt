@@ -5,6 +5,7 @@ sqlalchemy==2.0.50
 pydantic==2.13.4
 pydantic-settings==2.14.1
 python-dotenv==1.2.2
+mcp==1.28.0
 
 # Garmin Connect
 garminconnect==0.3.5
@@ -24,4 +25,3 @@ python-dateutil==2.9.0.post0
 requests==2.34.2
 Markdown==3.10.2
 Pygments==2.20.0
-mcp>=1.0.0,<2.0.0
