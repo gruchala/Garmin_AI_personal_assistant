@@ -18,8 +18,19 @@ from ..collectors.sync_activities import ActivitiesSync
 from ..processors.recovery_score import RecoveryScore
 from ..processors.sleep_metrics import SleepMetrics
 from ..processors.hrv_metrics import HRVMetrics
-from ..ai.insights import InsightsGenerator, InsightsAssistant
-from ..services.workflows import build_daily_report, build_training_suggestion
+from ..ai.insights import (
+    InsightsGenerator,
+    InsightsAssistant,
+    load_agent_notes,
+    load_user_context,
+)
+from ..services.workflows import (
+    build_daily_report,
+    build_training_suggestion,
+    extract_body_battery,
+    load_training_plan,
+    run_full_sync,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +104,14 @@ class FilePreviewRequest(BaseModel):
     kind: str = "markdown"
 
 
+class AthleteSnapshotRequest(BaseModel):
+    """Request do pobierania pełnego snapshotu zawodnika pod MCP/agenta."""
+    target_date: Optional[str] = None
+    sync_live: bool = False
+    recent_days: int = 14
+    activity_limit: int = 12
+
+
 def get_editable_file_or_404(file_name: str) -> dict:
     """Zwraca konfigurację dozwolonego pliku albo 404."""
     file_info = editable_files.get(file_name)
@@ -147,6 +166,159 @@ def parse_target_date(raw_date: Optional[str]) -> date:
     if not raw_date:
         return date.today()
     return datetime.strptime(raw_date, "%Y-%m-%d").date()
+
+
+def serialize_latest_weight(repo: GarminRepository) -> dict:
+    """Zwraca ostatni wpis o masie ciała w lekkim formacie."""
+    latest_weight = repo.get_latest_weight()
+    return {
+        "date": latest_weight.date.isoformat() if latest_weight else None,
+        "weight_kg": (latest_weight.weight_grams / 1000) if latest_weight and latest_weight.weight_grams else None,
+        "bmi": latest_weight.bmi if latest_weight else None,
+        "body_fat_percent": latest_weight.body_fat_percent if latest_weight else None,
+        "body_water_percent": latest_weight.body_water_percent if latest_weight else None,
+        "muscle_mass_kg": (
+            latest_weight.muscle_mass_grams / 1000
+            if latest_weight and latest_weight.muscle_mass_grams
+            else None
+        ),
+        "bone_mass_kg": (
+            latest_weight.bone_mass_grams / 1000
+            if latest_weight and latest_weight.bone_mass_grams
+            else None
+        ),
+    }
+
+
+def serialize_latest_vo2max(repo: GarminRepository) -> dict:
+    """Zwraca ostatni wpis VO2max w lekkim formacie."""
+    latest_vo2 = repo.get_latest_vo2max()
+    return {
+        "date": latest_vo2.date.isoformat() if latest_vo2 else None,
+        "vo2max": latest_vo2.vo2max_precise if latest_vo2 else None,
+        "vo2max_rounded": latest_vo2.vo2max_value if latest_vo2 else None,
+        "fitness_age": latest_vo2.fitness_age if latest_vo2 else None,
+    }
+
+
+def serialize_body_battery(repo: GarminRepository, target_date: date) -> dict:
+    """Zwraca uproszczony status Body Battery z lokalnej bazy."""
+    metrics = repo.get_daily_metrics(target_date)
+    return {
+        "value": metrics.body_battery_highest if metrics else None,
+        "highest": metrics.body_battery_highest if metrics else None,
+        "lowest": metrics.body_battery_lowest if metrics else None,
+        "charged": metrics.body_battery_charged if metrics else None,
+        "drained": metrics.body_battery_drained if metrics else None,
+        "trend": "",
+    }
+
+
+def build_athlete_snapshot(
+    repo: GarminRepository,
+    target_date: date,
+    sync_live: bool,
+    recent_days: int,
+    activity_limit: int,
+) -> dict:
+    """Buduje pełny snapshot zawodnika pod MCP lub zewnętrznego agenta."""
+    sync_summary = None
+    body_battery = serialize_body_battery(repo, target_date)
+
+    if sync_live:
+        sync_result = run_full_sync(
+            repository=repo,
+            target_date=target_date,
+            sync_days=max(7, recent_days),
+            activity_limit=max(50, activity_limit),
+        )
+        sync_summary = sync_result["summary"]
+        raw_body_battery = sync_result["client"].get_body_battery(target_date)
+        value, trend = extract_body_battery(raw_body_battery)
+        body_battery = {
+            "value": value,
+            "highest": body_battery["highest"],
+            "lowest": body_battery["lowest"],
+            "charged": body_battery["charged"],
+            "drained": body_battery["drained"],
+            "trend": trend,
+        }
+
+    recovery = RecoveryScore(repo)
+    sleep_metrics = SleepMetrics(repo)
+    hrv_metrics = HRVMetrics(repo)
+
+    start_date = target_date - timedelta(days=recent_days - 1)
+    recent_activities = repo.get_activity_history(
+        start_date=start_date,
+        end_date=target_date,
+        limit=activity_limit,
+        include_raw=False,
+        include_details=True,
+    )
+    today_activities = repo.get_activity_history(
+        start_date=target_date,
+        end_date=target_date,
+        limit=activity_limit,
+        include_raw=False,
+        include_details=True,
+    )
+
+    plan = load_training_plan()
+    day_name = target_date.strftime("%A")
+    day_name_pl = {
+        "Monday": "Poniedziałek",
+        "Tuesday": "Wtorek",
+        "Wednesday": "Środa",
+        "Thursday": "Czwartek",
+        "Friday": "Piątek",
+        "Saturday": "Sobota",
+        "Sunday": "Niedziela",
+    }[day_name]
+
+    return {
+        "date": target_date.isoformat(),
+        "sync": sync_summary,
+        "profile_context": load_user_context(),
+        "agent_notes_recent": load_agent_notes(),
+        "training_plan": {
+            "day_name": day_name_pl,
+            "planned_workout": plan.get(day_name_pl, "Brak wpisu w planie na ten dzień"),
+            "notes": plan.get("_notes", ""),
+        },
+        "readiness": recovery.calculate_daily_readiness(target_date),
+        "weekly_recovery": recovery.get_weekly_recovery_report(),
+        "sleep": {
+            "today": repo.get_sleep_data_for_date(target_date),
+            "trends_7d": sleep_metrics.get_sleep_trends(7),
+            "consistency_14d": sleep_metrics.analyze_sleep_consistency(14),
+        },
+        "hrv": {
+            "today": repo.get_hrv_data_for_date(target_date),
+            "baseline_28d": hrv_metrics.calculate_baseline(28),
+            "trend_7d": hrv_metrics.get_hrv_trend(7),
+            "overtraining_risk_14d": hrv_metrics.detect_overtraining_risk(14),
+        },
+        "resting_heart_rate": repo.get_resting_heart_rate_for_date(target_date),
+        "body_battery": body_battery,
+        "body_composition": serialize_latest_weight(repo),
+        "vo2max": serialize_latest_vo2max(repo),
+        "recent_activities": recent_activities,
+        "today_activities": today_activities,
+        "recent_insights": {
+            "count": len(repo.get_recent_insights(days=7)),
+            "items": [
+                {
+                    "date": insight.date.isoformat(),
+                    "type": insight.insight_type,
+                    "title": insight.title,
+                    "content": insight.content,
+                    "priority": insight.priority,
+                }
+                for insight in repo.get_recent_insights(days=7)[:5]
+            ],
+        },
+    }
 
 
 @router.get("/dashboard", include_in_schema=False)
@@ -327,6 +499,46 @@ async def generate_fresh_training_suggestion(
 
 
 # === ENDPOINTY DANYCH ===
+
+@router.get("/athlete/training-plan")
+async def get_training_plan_context():
+    """Zwraca sparsowany plan treningowy i kontekst tekstowy agenta."""
+    plan = load_training_plan()
+    return {
+        "training_plan": plan,
+        "profile_context": load_user_context(),
+        "agent_notes_recent": load_agent_notes(),
+    }
+
+
+@router.post("/athlete/snapshot")
+async def get_athlete_snapshot(
+    snapshot_request: AthleteSnapshotRequest,
+    session: Session = Depends(get_db_session()),
+):
+    """Zwraca pełny snapshot zawodnika gotowy pod agenta lub MCP."""
+    try:
+        if snapshot_request.recent_days < 1 or snapshot_request.recent_days > 90:
+            raise HTTPException(status_code=422, detail="recent_days musi być w zakresie 1-90")
+        if snapshot_request.activity_limit < 1 or snapshot_request.activity_limit > 50:
+            raise HTTPException(status_code=422, detail="activity_limit musi być w zakresie 1-50")
+
+        target_date = parse_target_date(snapshot_request.target_date)
+        repo = GarminRepository(session)
+        return build_athlete_snapshot(
+            repo=repo,
+            target_date=target_date,
+            sync_live=snapshot_request.sync_live,
+            recent_days=snapshot_request.recent_days,
+            activity_limit=snapshot_request.activity_limit,
+        )
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(status_code=422, detail="target_date musi mieć format YYYY-MM-DD")
+    except Exception as e:
+        logger.error(f"Błąd podczas budowania snapshotu zawodnika: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/readiness")
 async def get_readiness(
