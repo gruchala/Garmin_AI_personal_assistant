@@ -524,6 +524,20 @@
     </section>
 
     <section class="card" style="margin-top: 18px;">
+      <div class="eyebrow">Dostęp API</div>
+      <h2>Token do żądań</h2>
+      <p class="muted">Jeśli backend wymaga klucza, wpisz go tutaj. Panel zapisze go lokalnie w przeglądarce i doda do nagłówka <code>X-Agent-Token</code>.</p>
+      <div class="field">
+        <label for="api-key">API token</label>
+        <input id="api-key" type="password" placeholder="wklej token API" style="width:100%; padding:14px 16px; border-radius:14px; border:1px solid var(--line); background:var(--surface-strong); font:inherit; color:var(--text);">
+      </div>
+      <div class="button-row" style="margin-top:0;">
+        <button id="save-api-key" class="ghost" type="button">Zapisz token lokalnie</button>
+        <button id="clear-api-key" class="ghost" type="button">Wyczyść token</button>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top: 18px;">
       <div class="eyebrow">Uwaga na dziś</div>
       <input
         id="quick-note"
@@ -624,9 +638,34 @@
     const saveFileButton = document.getElementById("save-file");
     const reloadFileButton = document.getElementById("reload-file");
     const localFileInput = document.getElementById("local-file");
+    const apiKeyInput = document.getElementById("api-key");
+    const saveApiKeyButton = document.getElementById("save-api-key");
+    const clearApiKeyButton = document.getElementById("clear-api-key");
     let fileCatalog = [];
     let previewRequestVersion = 0;
     let livePreviewTimer = null;
+    const API_KEY_STORAGE_KEY = "garmin_api_token";
+
+    function getApiToken() {
+      return localStorage.getItem(API_KEY_STORAGE_KEY) || "";
+    }
+
+    function buildApiHeaders(extraHeaders = {}) {
+      const headers = new Headers(extraHeaders);
+      const token = getApiToken().trim();
+      if (token) {
+        headers.set("X-Agent-Token", token);
+      }
+      return headers;
+    }
+
+    function apiFetch(url, options = {}) {
+      const nextOptions = {
+        ...options,
+        headers: buildApiHeaders(options.headers || {}),
+      };
+      return fetch(url, nextOptions);
+    }
 
     function setBusy(isBusy, label) {
       reportButton.disabled = isBusy;
@@ -671,7 +710,7 @@
       const currentVersion = ++previewRequestVersion;
 
       try {
-        const response = await fetch("/api/v1/files/preview", {
+        const response = await apiFetch("/api/v1/files/preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -710,7 +749,7 @@
     }
 
     async function loadFileCatalog() {
-      const response = await fetch("/api/v1/files");
+      const response = await apiFetch("/api/v1/files");
       const data = await response.json();
       fileCatalog = data.files || [];
 
@@ -733,7 +772,7 @@
       }
 
       editorStatus.textContent = "Ładowanie pliku...";
-      const response = await fetch(`/api/v1/files/${encodeURIComponent(selectedName)}`);
+      const response = await apiFetch(`/api/v1/files/${encodeURIComponent(selectedName)}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -757,7 +796,7 @@
       reloadFileButton.disabled = true;
 
       try {
-        const response = await fetch(`/api/v1/files/${encodeURIComponent(selectedName)}`, {
+        const response = await apiFetch(`/api/v1/files/${encodeURIComponent(selectedName)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: fileEditor.value }),
@@ -835,7 +874,7 @@
       resultNode.innerHTML = "";
 
       try {
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -924,6 +963,24 @@
       editorStatus.textContent = `Wczytano lokalny plik ${file.name} do edytora.`;
       scheduleLivePreview();
     });
+
+    saveApiKeyButton.addEventListener("click", () => {
+      const token = apiKeyInput.value.trim();
+      if (!token) {
+        editorStatus.textContent = "Token jest pusty. Wpisz wartość i zapisz ponownie.";
+        return;
+      }
+      localStorage.setItem(API_KEY_STORAGE_KEY, token);
+      editorStatus.textContent = "Token API zapisany lokalnie w przeglądarce.";
+    });
+
+    clearApiKeyButton.addEventListener("click", () => {
+      localStorage.removeItem(API_KEY_STORAGE_KEY);
+      apiKeyInput.value = "";
+      editorStatus.textContent = "Token API usunięty z przeglądarki.";
+    });
+
+    apiKeyInput.value = getApiToken();
 
     loadFileCatalog().catch((error) => {
       fileDescription.textContent = "Nie udało się pobrać listy plików.";
